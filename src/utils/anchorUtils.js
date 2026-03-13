@@ -173,13 +173,16 @@ function lineIntersectsRect(x1, y1, x2, y2, r) {
 }
 
 function isPathSafe(pts, r1, r2) {
+  const lastSeg = pts.length - 2;
   for (let i = 0; i < pts.length - 1; i++) {
     const x1 = pts[i].x;
     const y1 = pts[i].y;
     const x2 = pts[i+1].x;
     const y2 = pts[i+1].y;
-    if (lineIntersectsRect(x1, y1, x2, y2, r1)) return false;
-    if (lineIntersectsRect(x1, y1, x2, y2, r2)) return false;
+    // i === 0 is the source arm — it always starts on the source node border, skip vs r1
+    if (i !== 0 && lineIntersectsRect(x1, y1, x2, y2, r1)) return false;
+    // i === lastSeg is the target arm — it always ends on the target node border, skip vs r2
+    if (i !== lastSeg && lineIntersectsRect(x1, y1, x2, y2, r2)) return false;
   }
   return true;
 }
