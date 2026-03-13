@@ -20,6 +20,8 @@ const DraggableEdge = ({
   const [hovered, setHovered] = useState(null); // 'source' | 'target' | null
   const dragStartRef = useRef(null);
   const svgRef = useRef(null);
+  const prevSourcePos = useRef(null); // track absolute source position between renders
+  const prevTargetPos = useRef(null); // track absolute target position between renders
 
   const sourceAnchor = data?.sourceAnchor || DEFAULT_SOURCE_ANCHOR;
   const targetAnchor = data?.targetAnchor || DEFAULT_TARGET_ANCHOR;
@@ -71,10 +73,62 @@ const DraggableEdge = ({
     return buildRoundedPath(waypoints, 8);
   }, [waypoints]);
 
+  // When the source or target node moves (e.g. parent group dragged), shift
+  // all intermediate custom waypoints by the same delta so the path moves with
+  // the nodes instead of stretching.
   const [segmentDragging, setSegmentDragging] = useState(null); // index of segment being dragged
   const [hoveredSegment, setHoveredSegment] = useState(null); // index of segment being hovered
   const segmentDragStartRef = useRef(null);   // { x, y } in screen pixels at drag start
   const initialWaypointsRef = useRef(null);   // snapshot of waypoints at drag start
+
+  // Track node position changes and shift intermediate waypoints so the path
+  // moves with the group instead of stretching.
+  useEffect(() => {
+    if (!sourcePos || !targetPos) return;
+
+    const prev  = prevSourcePos.current;
+    const prevT = prevTargetPos.current;
+
+    // Always update stored positions so the next render computes the correct delta
+    prevSourcePos.current = { x: sourcePos.x, y: sourcePos.y };
+    prevTargetPos.current = { x: targetPos.x, y: targetPos.y };
+
+    if (!prev || !prevT) return; // First render — no delta yet
+
+    // Don't apply during active drags; positions will already be reflected in the
+    // customWaypoints the drag handler writes directly.
+    if (dragging || segmentDragging !== null) return;
+
+    const dxS = sourcePos.x - prev.x;
+    const dyS = sourcePos.y - prev.y;
+    const dxT = targetPos.x - prevT.x;
+    const dyT = targetPos.y - prevT.y;
+
+    // Nothing moved
+    if (Math.abs(dxS) < 0.5 && Math.abs(dyS) < 0.5 && Math.abs(dxT) < 0.5 && Math.abs(dyT) < 0.5) return;
+
+    setEdges((eds) => eds.map((ed) => {
+      if (ed.id !== id || !ed.data?.customWaypoints?.length) return ed;
+      const cw = ed.data.customWaypoints;
+      if (cw.length < 3) return ed; // Only endpoints, nothing to shift
+
+      const sameDelta =
+        Math.abs(dxS - dxT) < 1 && Math.abs(dyS - dyT) < 1;
+
+      if (sameDelta) {
+        // Both nodes moved together (group drag) — shift intermediate points uniformly
+        const newWaypoints = cw.map((p, i) => {
+          if (i === 0 || i === cw.length - 1) return p; // endpoints are re-pinned by the waypoints memo
+          return { x: p.x + dxS, y: p.y + dyS };
+        });
+        return { ...ed, data: { ...ed.data, customWaypoints: newWaypoints } };
+      } else {
+        // Nodes moved by different amounts (different groups or one free) — fall back to auto-router
+        return { ...ed, data: { ...ed.data, customWaypoints: null } };
+      }
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourcePos?.x, sourcePos?.y, targetPos?.x, targetPos?.y, dragging, segmentDragging, id, setEdges]);
 
   const updateAnchor = useCallback(
     (endpoint, newAnchor) => {
