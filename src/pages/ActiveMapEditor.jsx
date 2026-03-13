@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ReactFlow, Controls, MiniMap, Background, useNodesState, useEdgesState,
-  addEdge, Panel, Handle, Position,
+  Panel, Handle, Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { toPng } from 'html-to-image';
@@ -53,7 +53,7 @@ function ActiveDeviceNode({ data, selected }) {
 const nodeTypes = { activeDevice: ActiveDeviceNode };
 
 // ── Interface Picker Modal ─────────────────────────────────────────────
-function InterfacePicker({ title, interfaces, onSelect, onClose }) {
+function InterfacePicker({ title, interfaces, allCount = 0, onSelect, onClose }) {
   const fmtSpeed = (s) => {
     if (!s) return '';
     const n = Number(s);
@@ -69,7 +69,11 @@ function InterfacePicker({ title, interfaces, onSelect, onClose }) {
         </div>
         <div className="modal-body iface-picker">
           {interfaces.length === 0 ? (
-            <div className="empty-state">No interfaces defined for this device.</div>
+            <div className="empty-state">
+              {allCount > 0
+                ? 'All interfaces on this device are already connected.'
+                : 'No interfaces defined for this device.'}
+            </div>
           ) : (
             interfaces.map((iface, i) => (
               <button key={i} className="iface-pick-btn" onClick={() => onSelect(iface)}>
@@ -207,6 +211,28 @@ export default function ActiveMapEditor() {
     e.dataTransfer.effectAllowed = 'move';
   }, []);
 
+  // ── Track which interfaces are already wired up ───────────────────
+  // Returns a Map: nodeId -> Set<interfaceName>
+  const usedIfacesByNode = useMemo(() => {
+    const map = new Map();
+    edges.forEach((edge) => {
+      if (edge.data?.sourceIface) {
+        if (!map.has(edge.source)) map.set(edge.source, new Set());
+        map.get(edge.source).add(edge.data.sourceIface);
+      }
+      if (edge.data?.targetIface) {
+        if (!map.has(edge.target)) map.set(edge.target, new Set());
+        map.get(edge.target).add(edge.data.targetIface);
+      }
+    });
+    return map;
+  }, [edges]);
+
+  const getFreeInterfaces = useCallback((node) => {
+    const used = usedIfacesByNode.get(node.id) || new Set();
+    return (node.data.interfaces || []).filter((iface) => !used.has(iface.name));
+  }, [usedIfacesByNode]);
+
   // ── Connection / Interface picker ─────────────────────────────────
   const onConnect = useCallback((params) => {
     const sourceNode = nodes.find((n) => n.id === params.source);
@@ -219,8 +245,10 @@ export default function ActiveMapEditor() {
       sourceNode,
       targetNode,
       sourceIface: null,
+      sourceFreeIfaces: getFreeInterfaces(sourceNode),
+      targetFreeIfaces: getFreeInterfaces(targetNode),
     });
-  }, [nodes]);
+  }, [nodes, getFreeInterfaces]);
 
   const handleSourceIfaceSelect = useCallback((iface) => {
     setPickerStep((prev) => ({ ...prev, step: 'target', sourceIface: iface }));
@@ -232,8 +260,9 @@ export default function ActiveMapEditor() {
     const tgtLabel = iface?.name || '';
     const linkLabel = [srcLabel, tgtLabel].filter(Boolean).join(' ↔ ') || null;
 
-    setEdges((eds) => addEdge({
+    const newEdge = {
       ...params,
+      id: `ae_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       type: 'draggable',
       data: {
         sourceAnchor: { side: 'bottom', offset: 0.5 },
@@ -243,8 +272,10 @@ export default function ActiveMapEditor() {
         linkLabel,
         color: '#f59e0b',
       },
-    }, eds));
+    };
 
+    // Directly append — skip addEdge() so it never deduplicates multi-links
+    setEdges((eds) => [...eds, newEdge]);
     setPickerStep(null);
   }, [pickerStep, setEdges]);
 
@@ -408,7 +439,8 @@ export default function ActiveMapEditor() {
       {pickerStep?.step === 'source' && (
         <InterfacePicker
           title={`${pickerStep.sourceNode.data.label} — Source Interface`}
-          interfaces={pickerStep.sourceNode.data.interfaces || []}
+          interfaces={pickerStep.sourceFreeIfaces}
+          allCount={(pickerStep.sourceNode.data.interfaces || []).length}
           onSelect={handleSourceIfaceSelect}
           onClose={cancelPicker}
         />
@@ -416,7 +448,8 @@ export default function ActiveMapEditor() {
       {pickerStep?.step === 'target' && (
         <InterfacePicker
           title={`${pickerStep.targetNode.data.label} — Target Interface`}
-          interfaces={pickerStep.targetNode.data.interfaces || []}
+          interfaces={pickerStep.targetFreeIfaces}
+          allCount={(pickerStep.targetNode.data.interfaces || []).length}
           onSelect={handleTargetIfaceSelect}
           onClose={cancelPicker}
         />
