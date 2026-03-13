@@ -98,6 +98,8 @@ const DraggableEdge = ({
           } else {
             updatedData.targetAnchor = newAnchor;
           }
+          // Clear custom waypoints so the auto-router recalculates the full path
+          delete updatedData.customWaypoints;
           return { ...e, data: updatedData };
         })
       );
