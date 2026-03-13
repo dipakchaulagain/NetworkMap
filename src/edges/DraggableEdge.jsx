@@ -163,36 +163,65 @@ const DraggableEdge = ({
         const isTargetArm = segmentDragging === base.length - 2;
 
         if (isSourceArm) {
-          // p1 is pinned to the source node. To avoid diagonal lines, keep the arm
-          // perpendicular to the node and insert a 90° bend for off-axis movement.
+          // p1 is pinned to the source node.
+          // Use dominant axis to keep every segment strictly horizontal or vertical.
           const armIsVertical = Math.abs(p1.x - p2.x) < 0.5;
           if (armIsVertical) {
-            // Arm exits source top/bottom. Extend by totalDy; add horizontal exit for totalDx.
-            pts[1] = { x: p1.x + totalDx, y: p2.y + totalDy };
-            if (Math.abs(totalDx) >= 0.5) {
-              pts.splice(1, 0, { x: p1.x + totalDx, y: p1.y }); // bend at source level
+            // Arm exits top/bottom of source
+            if (Math.abs(totalDx) >= Math.abs(totalDy)) {
+              // Horizontal dominant: shift arm sideways — insert horizontal exit + vertical arm
+              pts[1] = { x: p1.x + totalDx, y: p2.y }; // arm end stays at original y
+              if (Math.abs(totalDx) >= 0.5) {
+                pts.splice(1, 0, { x: p1.x + totalDx, y: p1.y }); // horizontal exit bend
+              }
+            } else {
+              // Vertical dominant: extend/shrink arm, propagate y to adjacent horizontal segment
+              pts[1] = { x: p1.x, y: p2.y + totalDy };
+              if (pts.length > 2) pts[2] = { ...pts[2], y: p2.y + totalDy };
             }
           } else {
-            // Arm exits source left/right. Extend by totalDx; add vertical exit for totalDy.
-            pts[1] = { x: p2.x + totalDx, y: p1.y + totalDy };
-            if (Math.abs(totalDy) >= 0.5) {
-              pts.splice(1, 0, { x: p1.x, y: p1.y + totalDy }); // bend at source level
+            // Arm exits left/right of source
+            if (Math.abs(totalDy) >= Math.abs(totalDx)) {
+              // Vertical dominant: shift arm — insert vertical exit + horizontal arm
+              pts[1] = { x: p2.x, y: p1.y + totalDy }; // arm end stays at original x
+              if (Math.abs(totalDy) >= 0.5) {
+                pts.splice(1, 0, { x: p1.x, y: p1.y + totalDy }); // vertical exit bend
+              }
+            } else {
+              // Horizontal dominant: extend/shrink arm, propagate x to adjacent vertical segment
+              pts[1] = { x: p2.x + totalDx, y: p1.y };
+              if (pts.length > 2) pts[2] = { ...pts[2], x: p2.x + totalDx };
             }
           }
         } else if (isTargetArm) {
-          // p2 is pinned to the target node. Keep arm perpendicular; insert bend for off-axis.
+          // p2 is pinned to the target node.
           const armIsVertical = Math.abs(p1.x - p2.x) < 0.5;
+          const si = segmentDragging;
           if (armIsVertical) {
-            // Arm enters target top/bottom. Extend by totalDy; add horizontal exit for totalDx.
-            pts[segmentDragging] = { x: p2.x + totalDx, y: p1.y + totalDy };
-            if (Math.abs(totalDx) >= 0.5) {
-              pts.splice(segmentDragging + 1, 0, { x: p2.x + totalDx, y: p2.y }); // bend at target level
+            // Arm enters top/bottom of target
+            if (Math.abs(totalDx) >= Math.abs(totalDy)) {
+              // Horizontal dominant: shift arm sideways — arm start stays at original y
+              pts[si] = { x: p2.x + totalDx, y: p1.y };
+              if (Math.abs(totalDx) >= 0.5) {
+                pts.splice(si + 1, 0, { x: p2.x + totalDx, y: p2.y }); // bend at target level
+              }
+            } else {
+              // Vertical dominant: extend/shrink arm, propagate y to adjacent horizontal segment
+              pts[si] = { x: p1.x, y: p1.y + totalDy };
+              if (si > 0) pts[si - 1] = { ...pts[si - 1], y: p1.y + totalDy };
             }
           } else {
-            // Arm enters target left/right. Extend by totalDx; add vertical exit for totalDy.
-            pts[segmentDragging] = { x: p1.x + totalDx, y: p2.y + totalDy };
-            if (Math.abs(totalDy) >= 0.5) {
-              pts.splice(segmentDragging + 1, 0, { x: p2.x, y: p2.y + totalDy }); // bend at target level
+            // Arm enters left/right of target
+            if (Math.abs(totalDy) >= Math.abs(totalDx)) {
+              // Vertical dominant: shift arm — arm start stays at original x
+              pts[si] = { x: p1.x, y: p2.y + totalDy };
+              if (Math.abs(totalDy) >= 0.5) {
+                pts.splice(si + 1, 0, { x: p2.x, y: p2.y + totalDy }); // bend at target level
+              }
+            } else {
+              // Horizontal dominant: extend/shrink arm, propagate x to adjacent vertical segment
+              pts[si] = { x: p1.x + totalDx, y: p2.y };
+              if (si > 0) pts[si - 1] = { ...pts[si - 1], x: p1.x + totalDx };
             }
           }
         } else {
