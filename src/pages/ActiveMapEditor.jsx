@@ -112,6 +112,7 @@ export default function ActiveMapEditor() {
   const [hasUnsaved, setHasUnsaved]   = useState(false);
   const [loading, setLoading]         = useState(true);
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [mode, setMode]               = useState('edit');
 
   // Interface picker state
   const [pickerStep, setPickerStep]   = useState(null);
@@ -308,18 +309,32 @@ export default function ActiveMapEditor() {
         <button className="back-btn" onClick={() => navigate('/maps')}>← Maps</button>
         <span className="editor-title">{mapMeta?.name}</span>
         <span className="map-type-pill active">Active Map</span>
+        <div className="mode-toggle">
+          <button
+            className={mode === 'view' ? 'active' : ''}
+            onClick={() => setMode('view')}
+          >View</button>
+          <button
+            className={mode === 'edit' ? 'active' : ''}
+            onClick={() => setMode('edit')}
+          >Edit</button>
+        </div>
         <div className="topbar-actions">
-          <button className="btn-sm" onClick={onAutoLayout} title="Auto arrange nodes">Auto Layout</button>
+          {mode === 'edit' && (
+            <button className="btn-sm" onClick={onAutoLayout} title="Auto arrange nodes">Auto Layout</button>
+          )}
           <button className="btn-sm" onClick={onPollAll} title="Re-poll all SNMP devices">Refresh SNMP</button>
           <button className="btn-sm" onClick={onExportPng} title="Export canvas as PNG">Export PNG</button>
-          {hasUnsaved && <span className="unsaved-dot" title="Unsaved changes">●</span>}
-          <button className="btn-primary btn-sm" onClick={handleSave}>Save Map</button>
+          {mode === 'edit' && hasUnsaved && <span className="unsaved-dot" title="Unsaved changes">●</span>}
+          {mode === 'edit' && (
+            <button className="btn-primary btn-sm" onClick={handleSave}>Save Map</button>
+          )}
         </div>
       </div>
 
       <div className="editor-body">
-        {/* ── Inventory Sidebar ── */}
-        <div className={`active-sidebar ${isSidebarOpen ? '' : 'collapsed'}`}>
+        {/* ── Inventory Sidebar (edit mode only) ── */}
+        <div className={`active-sidebar ${isSidebarOpen && mode === 'edit' ? '' : 'collapsed'}`}>
           <div className="active-sidebar-header">
             {isSidebarOpen && <span>Device Inventory</span>}
             <button
@@ -377,21 +392,24 @@ export default function ActiveMapEditor() {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
+            onConnect={mode === 'edit' ? onConnect : undefined}
             onInit={setRfInstance}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            onNodeDoubleClick={onNodeDoubleClick}
+            onDrop={mode === 'edit' ? onDrop : undefined}
+            onDragOver={mode === 'edit' ? onDragOver : undefined}
+            onNodeDoubleClick={mode === 'edit' ? onNodeDoubleClick : undefined}
+            nodesDraggable={mode === 'edit'}
+            nodesConnectable={mode === 'edit'}
+            elementsSelectable={mode === 'edit'}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
             connectionMode="loose"
             fitView
             fitViewOptions={{ padding: 0.2 }}
-            snapToGrid
+            snapToGrid={mode === 'edit'}
             snapGrid={[20, 20]}
             proOptions={proOptions}
-            deleteKeyCode={['Delete', 'Backspace']}
+            deleteKeyCode={mode === 'edit' ? ['Delete', 'Backspace'] : null}
             connectionLineType="smoothstep"
           >
             <Controls position="bottom-right" className="flow-controls" />

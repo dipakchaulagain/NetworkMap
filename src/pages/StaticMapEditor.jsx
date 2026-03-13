@@ -35,6 +35,7 @@ export default function StaticMapEditor() {
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const isFirstRender = useRef(true);
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState('edit');
 
   useEffect(() => {
     const load = async () => {
@@ -135,26 +136,44 @@ export default function StaticMapEditor() {
         <button className="back-btn" onClick={() => navigate('/maps')}>← Maps</button>
         <span className="editor-title">{mapMeta?.name}</span>
         <span className="map-type-pill static">Static Map</span>
+        <div className="mode-toggle">
+          <button
+            className={mode === 'view' ? 'active' : ''}
+            onClick={() => setMode('view')}
+          >View</button>
+          <button
+            className={mode === 'edit' ? 'active' : ''}
+            onClick={() => setMode('edit')}
+          >Edit</button>
+        </div>
+        {mode === 'edit' && hasUnsaved && <span className="unsaved-dot" title="Unsaved changes">●</span>}
       </div>
       <div className="editor-body">
-        <Toolbar
-          onAutoLayout={onAutoLayout} onAddGroup={onAddGroup} onSave={onSave}
-          hasUnsaved={hasUnsaved} onExportPng={onExportPng} onExport={onExport}
-          onImport={onImport} onClear={onClear}
-        />
+        {mode === 'edit' && (
+          <Toolbar
+            onAutoLayout={onAutoLayout} onAddGroup={onAddGroup} onSave={onSave}
+            hasUnsaved={hasUnsaved} onExportPng={onExportPng} onExport={onExport}
+            onImport={onImport} onClear={onClear}
+          />
+        )}
         <div className="canvas-container" ref={reactFlowWrapper}>
           <ReactFlow
             nodes={nodes} edges={edges}
             onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
-            onConnect={onConnect} onInit={setReactFlowInstance}
-            onDrop={onDrop} onDragOver={onDragOver}
-            onNodeDoubleClick={onNodeDoubleClick}
+            onConnect={mode === 'edit' ? onConnect : undefined}
+            onInit={setReactFlowInstance}
+            onDrop={mode === 'edit' ? onDrop : undefined}
+            onDragOver={mode === 'edit' ? onDragOver : undefined}
+            onNodeDoubleClick={mode === 'edit' ? onNodeDoubleClick : undefined}
+            nodesDraggable={mode === 'edit'}
+            nodesConnectable={mode === 'edit'}
+            elementsSelectable={mode === 'edit'}
             nodeTypes={nodeTypes} edgeTypes={edgeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
             fitView fitViewOptions={{ padding: 0.2 }}
-            snapToGrid snapGrid={[20, 20]}
+            snapToGrid={mode === 'edit'} snapGrid={[20, 20]}
             proOptions={proOptions}
-            deleteKeyCode={['Delete', 'Backspace']}
+            deleteKeyCode={mode === 'edit' ? ['Delete', 'Backspace'] : null}
             connectionLineType="smoothstep"
           >
             <Controls position="bottom-right" className="flow-controls" />

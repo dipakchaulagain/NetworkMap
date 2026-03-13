@@ -4,10 +4,162 @@
     "name": "Srv-01",
     "type": "active",
     "description": "",
-    "nodes": [],
-    "edges": [],
+    "nodes": [
+      {
+        "id": "an_100",
+        "type": "activeDevice",
+        "position": {
+          "x": 280,
+          "y": 120
+        },
+        "data": {
+          "label": "EXSi-Node-01",
+          "deviceType": "server",
+          "deviceId": "8f36640c-3445-4ba3-bad3-2177b16fa149",
+          "category": "custom",
+          "status": "unknown",
+          "interfaces": [
+            {
+              "name": "eth0",
+              "speed": 1000,
+              "type": "copper",
+              "operStatus": "up",
+              "adminStatus": "up"
+            },
+            {
+              "name": "eth1",
+              "speed": 1000,
+              "type": "copper",
+              "operStatus": "up",
+              "adminStatus": "up"
+            },
+            {
+              "name": "eth2",
+              "speed": 1000,
+              "type": "copper",
+              "operStatus": "up",
+              "adminStatus": "up"
+            },
+            {
+              "name": "eth3",
+              "speed": 1000,
+              "type": "copper",
+              "operStatus": "up",
+              "adminStatus": "up"
+            }
+          ]
+        },
+        "measured": {
+          "width": 125,
+          "height": 106
+        },
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "an_102",
+        "type": "activeDevice",
+        "position": {
+          "x": -60,
+          "y": -80
+        },
+        "data": {
+          "label": "EXSi-Node-02",
+          "deviceType": "server",
+          "deviceId": "9e507f87-bd01-4282-a7f1-5cda2f7134a7",
+          "category": "custom",
+          "status": "unknown",
+          "interfaces": [
+            {
+              "name": "eth0",
+              "speed": 1000,
+              "type": "copper",
+              "operStatus": "up",
+              "adminStatus": "up"
+            },
+            {
+              "name": "eth1",
+              "speed": 1000,
+              "type": "copper",
+              "operStatus": "up",
+              "adminStatus": "up"
+            },
+            {
+              "name": "eth2",
+              "speed": 1000,
+              "type": "copper",
+              "operStatus": "up",
+              "adminStatus": "up"
+            },
+            {
+              "name": "eth3",
+              "speed": 1000,
+              "type": "copper",
+              "operStatus": "up",
+              "adminStatus": "up"
+            }
+          ]
+        },
+        "measured": {
+          "width": 127,
+          "height": 106
+        },
+        "selected": false,
+        "dragging": false
+      }
+    ],
+    "edges": [
+      {
+        "type": "draggable",
+        "animated": false,
+        "data": {
+          "sourceAnchor": {
+            "side": "bottom",
+            "offset": 0.47244094488188976
+          },
+          "targetAnchor": {
+            "side": "top",
+            "offset": 0.5
+          },
+          "sourceIface": "eth0",
+          "targetIface": "eth0",
+          "linkLabel": "eth0 ↔ eth0",
+          "color": "#f59e0b"
+        },
+        "source": "an_102",
+        "sourceHandle": "right",
+        "target": "an_100",
+        "targetHandle": "left",
+        "id": "ae_1773419885130_dnisr",
+        "selected": false
+      },
+      {
+        "type": "draggable",
+        "animated": false,
+        "data": {
+          "sourceAnchor": {
+            "side": "bottom",
+            "offset": 0.31496062992125984
+          },
+          "targetAnchor": {
+            "side": "bottom",
+            "offset": 0.32
+          },
+          "sourceIface": "eth1",
+          "targetIface": "eth1",
+          "linkLabel": "eth1 ↔ eth1",
+          "color": "#f59e0b"
+        },
+        "source": "an_102",
+        "sourceHandle": "right",
+        "target": "an_100",
+        "targetHandle": "left",
+        "id": "ae_1773419896368_vf0v6",
+        "selected": false
+      }
+    ],
     "createdAt": "2026-03-13T16:07:39.239Z",
-    "updatedAt": "2026-03-13T16:07:39.239Z"
+    "updatedAt": "2026-03-13T16:40:55.141Z"
   },
   {
     "id": "f533b69d-5ee5-4d90-bea4-b2024ecb4a5e",
