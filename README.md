@@ -1,16 +1,47 @@
-# React + Vite
+# NetworkMap
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+NetworkMap is a premium, interactive network diagramming platform built with React and `@xyflow/react`. It provides a powerful interface for visualizing complex network topologies with advanced orthogonal routing and manual segment adjustments.
 
-Currently, two official plugins are available:
+## 🚀 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Custom Device Nodes**: Specialized nodes for Cloud/Internet, Routers, Switches, Firewalls, and Servers with high-quality icons.
+- **Logical Grouping**: Organise nodes into containers for better structural clarity.
+- **Advanced Orthogonal Routing**: Intelligent edge routing that automatically maneuvers around nodes to avoid visual intersections.
+- **Interactive Segment Dragging**: Fine-tune your diagram by dragging straight segments of any connection horizontally or vertically.
+- **Automatic Layout**: Integrated with `dagre` for one-click hierarchical layout adjustments.
+- **Persistence**: Automatically saves your diagram to `localStorage`, ensuring your progress is never lost between refreshes.
+- **Export/Import**: Easily save your work to JSON files or import existing configurations.
 
-## React Compiler
+## 🛠️ Technology Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Framework**: React 18
+- **Diagramming Library**: [@xyflow/react](https://reactflow.dev/) (V12+)
+- **Layout Engine**: [Dagre](https://github.com/dagrejs/dagre)
+- **Styling**: Vanilla CSS with modern HSL color palettes.
+- **Build Tool**: Vite
 
-## Expanding the ESLint configuration
+## 📦 Getting Started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Installation
+
+```bash
+# Install dependencies
+npm install
+```
+
+### Development
+
+```bash
+# Start the development server
+npm run dev
+```
+
+### Production
+
+```bash
+# Build the application
+npm run build
+```
+
+---
+*Created as part of the NetworkMap Infrastructure Visualization project.*
