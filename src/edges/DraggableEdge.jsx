@@ -163,25 +163,13 @@ const DraggableEdge = ({
         const isHorizontal = Math.abs(p1.y - p2.y) < 0.5;
 
         if (isHorizontal) {
-          // Move horizontal segment up/down; keep adjacent vertical segments connected
+          // Slide horizontal segment up/down — adjacent vertical segments extend/shrink naturally
           p1.y += dy;
           p2.y += dy;
-          if (segmentDragging > 0) {
-            newWaypoints[segmentDragging - 1] = { ...newWaypoints[segmentDragging - 1], y: p1.y };
-          }
-          if (segmentDragging + 2 < newWaypoints.length) {
-            newWaypoints[segmentDragging + 2] = { ...newWaypoints[segmentDragging + 2], y: p2.y };
-          }
         } else {
-          // Move vertical segment left/right; keep adjacent horizontal segments connected
+          // Slide vertical segment left/right — adjacent horizontal segments extend/shrink naturally
           p1.x += dx;
           p2.x += dx;
-          if (segmentDragging > 0) {
-            newWaypoints[segmentDragging - 1] = { ...newWaypoints[segmentDragging - 1], x: p1.x };
-          }
-          if (segmentDragging + 2 < newWaypoints.length) {
-            newWaypoints[segmentDragging + 2] = { ...newWaypoints[segmentDragging + 2], x: p2.x };
-          }
         }
 
         return eds.map(ed =>
