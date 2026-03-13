@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useReactFlow, useInternalNode } from '@xyflow/react';
-import { getAnchorPosition, getNearestAnchor, computeEdgePath, getNodeRect, buildRoundedPath } from '../utils/anchorUtils';
+import { getAnchorPosition, getNearestAnchor, computeEdgePath, getNodeRect, buildRoundedPath, cleanWaypoints } from '../utils/anchorUtils';
 
 const DEFAULT_SOURCE_ANCHOR = { side: 'bottom', offset: 0.5 };
 const DEFAULT_TARGET_ANCHOR = { side: 'top', offset: 0.5 };
@@ -73,6 +73,8 @@ const DraggableEdge = ({
 
   const [segmentDragging, setSegmentDragging] = useState(null); // index of segment being dragged
   const [hoveredSegment, setHoveredSegment] = useState(null); // index of segment being hovered
+  const segmentDragStartRef = useRef(null);   // { x, y } in screen pixels at drag start
+  const initialWaypointsRef = useRef(null);   // snapshot of waypoints at drag start
 
   const updateAnchor = useCallback(
     (endpoint, newAnchor) => {
@@ -141,39 +143,74 @@ const DraggableEdge = ({
     if (segmentDragging === null) return;
 
     const handleMouseMove = (e) => {
-      // Always read current zoom so it stays accurate after zoom changes
+      if (!segmentDragStartRef.current || !initialWaypointsRef.current) return;
+
       const { zoom } = getViewport();
-      const dx = e.movementX / zoom;
-      const dy = e.movementY / zoom;
+      // Use TOTAL delta from drag start (not incremental) so we always recompute cleanly
+      const totalDx = (e.clientX - segmentDragStartRef.current.x) / zoom;
+      const totalDy = (e.clientY - segmentDragStartRef.current.y) / zoom;
 
-      // Use setEdges functional updater to always operate on the latest edge state
       setEdges((eds) => {
-        const targetEdge = eds.find(ed => ed.id === id);
-        if (!targetEdge) return eds;
+        const base = initialWaypointsRef.current;
+        if (!base || base.length <= segmentDragging + 1) return eds;
 
-        const currentData = targetEdge.data || {};
-        // Use saved customWaypoints if present, otherwise snapshot the auto-computed ones
-        const base = currentData.customWaypoints?.length ? currentData.customWaypoints : waypoints;
-        const newWaypoints = base.map(p => ({ ...p }));
-
-        if (newWaypoints.length <= segmentDragging + 1) return eds;
-
-        const p1 = newWaypoints[segmentDragging];
-        const p2 = newWaypoints[segmentDragging + 1];
+        // Always start from the snapshotted initial waypoints
+        let pts = base.map(p => ({ ...p }));
+        const p1 = pts[segmentDragging];
+        const p2 = pts[segmentDragging + 1];
         const isHorizontal = Math.abs(p1.y - p2.y) < 0.5;
+        const isSourceArm = segmentDragging === 0;
+        const isTargetArm = segmentDragging === base.length - 2;
 
-        if (isHorizontal) {
-          // Slide horizontal segment up/down — adjacent vertical segments extend/shrink naturally
-          p1.y += dy;
-          p2.y += dy;
+        if (isSourceArm) {
+          // p1 is pinned to the source node. To avoid diagonal lines, keep the arm
+          // perpendicular to the node and insert a 90° bend for off-axis movement.
+          const armIsVertical = Math.abs(p1.x - p2.x) < 0.5;
+          if (armIsVertical) {
+            // Arm exits source top/bottom. Extend by totalDy; add horizontal exit for totalDx.
+            pts[1] = { x: p1.x + totalDx, y: p2.y + totalDy };
+            if (Math.abs(totalDx) >= 0.5) {
+              pts.splice(1, 0, { x: p1.x + totalDx, y: p1.y }); // bend at source level
+            }
+          } else {
+            // Arm exits source left/right. Extend by totalDx; add vertical exit for totalDy.
+            pts[1] = { x: p2.x + totalDx, y: p1.y + totalDy };
+            if (Math.abs(totalDy) >= 0.5) {
+              pts.splice(1, 0, { x: p1.x, y: p1.y + totalDy }); // bend at source level
+            }
+          }
+        } else if (isTargetArm) {
+          // p2 is pinned to the target node. Keep arm perpendicular; insert bend for off-axis.
+          const armIsVertical = Math.abs(p1.x - p2.x) < 0.5;
+          if (armIsVertical) {
+            // Arm enters target top/bottom. Extend by totalDy; add horizontal exit for totalDx.
+            pts[segmentDragging] = { x: p2.x + totalDx, y: p1.y + totalDy };
+            if (Math.abs(totalDx) >= 0.5) {
+              pts.splice(segmentDragging + 1, 0, { x: p2.x + totalDx, y: p2.y }); // bend at target level
+            }
+          } else {
+            // Arm enters target left/right. Extend by totalDx; add vertical exit for totalDy.
+            pts[segmentDragging] = { x: p1.x + totalDx, y: p2.y + totalDy };
+            if (Math.abs(totalDy) >= 0.5) {
+              pts.splice(segmentDragging + 1, 0, { x: p2.x, y: p2.y + totalDy }); // bend at target level
+            }
+          }
         } else {
-          // Slide vertical segment left/right — adjacent horizontal segments extend/shrink naturally
-          p1.x += dx;
-          p2.x += dx;
+          // Middle segment: slide the two endpoints in their constrained direction only.
+          if (isHorizontal) {
+            pts[segmentDragging]     = { ...p1, y: p1.y + totalDy };
+            pts[segmentDragging + 1] = { ...p2, y: p2.y + totalDy };
+          } else {
+            pts[segmentDragging]     = { ...p1, x: p1.x + totalDx };
+            pts[segmentDragging + 1] = { ...p2, x: p2.x + totalDx };
+          }
         }
 
+        // Remove collinear/duplicate waypoints so parallel segments are merged automatically
+        pts = cleanWaypoints(pts);
+
         return eds.map(ed =>
-          ed.id === id ? { ...ed, data: { ...ed.data, customWaypoints: newWaypoints } } : ed
+          ed.id === id ? { ...ed, data: { ...ed.data, customWaypoints: pts } } : ed
         );
       });
     };
@@ -181,6 +218,8 @@ const DraggableEdge = ({
     const handleMouseUp = () => {
       setSegmentDragging(null);
       setHoveredSegment(null);
+      segmentDragStartRef.current = null;
+      initialWaypointsRef.current = null;
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -190,15 +229,17 @@ const DraggableEdge = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [segmentDragging, id, setEdges, waypoints, getViewport]);
+  }, [segmentDragging, id, setEdges, getViewport]);
 
   const handleSegmentMouseDown = useCallback(
     (index) => (e) => {
       e.stopPropagation();
       e.preventDefault();
       setSegmentDragging(index);
+      segmentDragStartRef.current = { x: e.clientX, y: e.clientY };
+      initialWaypointsRef.current = waypoints.map(p => ({ ...p }));
     },
-    []
+    [waypoints]
   );
 
   // Guard render — all hooks are already called above

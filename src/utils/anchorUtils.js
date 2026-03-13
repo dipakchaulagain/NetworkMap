@@ -223,6 +223,43 @@ function getArmPoint(x, y, side, offset) {
   }
 }
 
+/**
+ * Remove duplicate and collinear intermediate waypoints to keep the path tidy.
+ * - Zero-length segments (duplicate consecutive points) are removed.
+ * - Intermediate points that lie on a straight line with their neighbours are removed,
+ *   merging the two adjacent segments into one.
+ */
+export function cleanWaypoints(pts) {
+  if (pts.length <= 2) return pts;
+
+  // Pass 1: remove duplicate consecutive points (zero-length segments)
+  const deduped = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const prev = deduped[deduped.length - 1];
+    const curr = pts[i];
+    if (Math.abs(curr.x - prev.x) > 0.5 || Math.abs(curr.y - prev.y) > 0.5) {
+      deduped.push({ ...curr });
+    }
+  }
+
+  if (deduped.length <= 2) return deduped;
+
+  // Pass 2: remove collinear intermediate points
+  const result = [deduped[0]];
+  for (let i = 1; i < deduped.length - 1; i++) {
+    const prev = result[result.length - 1];
+    const curr = deduped[i];
+    const next = deduped[i + 1];
+    const sameX = Math.abs(prev.x - curr.x) < 0.5 && Math.abs(curr.x - next.x) < 0.5;
+    const sameY = Math.abs(prev.y - curr.y) < 0.5 && Math.abs(curr.y - next.y) < 0.5;
+    if (!sameX && !sameY) {
+      result.push({ ...curr });
+    }
+  }
+  result.push({ ...deduped[deduped.length - 1] });
+  return result;
+}
+
 export function buildRoundedPath(pts, radius) {
   if (pts.length < 2) return '';
   if (pts.length === 2) {
