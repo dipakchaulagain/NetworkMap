@@ -72,6 +72,7 @@ const DraggableEdge = ({
   }, [waypoints]);
 
   const [segmentDragging, setSegmentDragging] = useState(null); // index of segment being dragged
+  const [hoveredSegment, setHoveredSegment] = useState(null); // index of segment being hovered
 
   const updateAnchor = useCallback(
     (endpoint, newAnchor) => {
@@ -191,6 +192,7 @@ const DraggableEdge = ({
 
     const handleMouseUp = () => {
       setSegmentDragging(null);
+      setHoveredSegment(null);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -242,38 +244,47 @@ const DraggableEdge = ({
       {waypoints.map((pt, i) => {
         if (i === waypoints.length - 1) return null;
         const nextPt = waypoints[i + 1];
-        const isHorizontal = Math.abs(pt.y - nextPt.y) < 0.1;
-        
+        const isHorizontal = Math.abs(pt.y - nextPt.y) < 0.5;
+
         // Don't render grab handle for zero-length segments
         const dist = Math.sqrt((pt.x - nextPt.x) ** 2 + (pt.y - nextPt.y) ** 2);
         if (dist < 5) return null;
 
-        // Optionally, don't allow dragging the very first arm attached to the node 
-        // if it might break the visual connection point, but for maximum flexibility we allow it here.
-        
+        const isActive = segmentDragging === i;
+        const isHovered = hoveredSegment === i && segmentDragging === null;
+
         return (
-          <line
-            key={`segment-${i}`}
-            x1={pt.x}
-            y1={pt.y}
-            x2={nextPt.x}
-            y2={nextPt.y}
-            stroke={segmentDragging === i ? '#f59e0b' : 'transparent'}
-            strokeWidth={12}
-            className="edge-segment-grab"
-            onMouseDown={handleSegmentMouseDown(i)}
-            style={{
-              cursor: isHorizontal ? 'row-resize' : 'col-resize',
-              pointerEvents: 'stroke',
-              transition: 'stroke 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              if (segmentDragging === null && !selected) e.target.style.stroke = 'rgba(59, 130, 246, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              if (segmentDragging !== i) e.target.style.stroke = 'transparent';
-            }}
-          />
+          <g key={`segment-${i}`}>
+            {/* Visible highlight — shown on hover or while dragging, rendered below hit area */}
+            {(isActive || isHovered) && (
+              <line
+                x1={pt.x}
+                y1={pt.y}
+                x2={nextPt.x}
+                y2={nextPt.y}
+                stroke={isActive ? '#f59e0b' : 'rgba(59,130,246,0.5)'}
+                strokeWidth={isActive ? 4 : 3}
+                style={{ pointerEvents: 'none' }}
+              />
+            )}
+            {/* Wide hit area — uses a near-zero-opacity stroke so pointer-events fires reliably */}
+            <line
+              x1={pt.x}
+              y1={pt.y}
+              x2={nextPt.x}
+              y2={nextPt.y}
+              stroke="black"
+              strokeOpacity={0.001}
+              strokeWidth={14}
+              style={{
+                cursor: isHorizontal ? 'row-resize' : 'col-resize',
+                pointerEvents: 'stroke',
+              }}
+              onMouseDown={handleSegmentMouseDown(i)}
+              onMouseEnter={() => setHoveredSegment(i)}
+              onMouseLeave={() => setHoveredSegment(null)}
+            />
+          </g>
         );
       })}
 
