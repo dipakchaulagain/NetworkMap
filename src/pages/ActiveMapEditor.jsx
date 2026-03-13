@@ -1,54 +1,81 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ReactFlow, Controls, MiniMap, Background, useNodesState, useEdgesState,
   addEdge, Panel, Handle, Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { toPng } from 'html-to-image';
 import api from '../api/client';
+import DraggableEdge from '../edges/DraggableEdge';
+import { getLayoutedElements } from '../utils/layoutEngine';
 import { CloudIcon, RouterIcon, SwitchIcon, FirewallIcon, ServerIcon, NetworkTreeIcon } from '../icons';
 
-const iconMap = { router: RouterIcon, switch: SwitchIcon, firewall: FirewallIcon, server: ServerIcon, network: NetworkTreeIcon, cloud: CloudIcon };
+const iconMap = {
+  router: RouterIcon, switch: SwitchIcon, firewall: FirewallIcon,
+  server: ServerIcon, network: NetworkTreeIcon, cloud: CloudIcon,
+  accesspoint: NetworkTreeIcon, other: ServerIcon,
+};
+
 const proOptions = { hideAttribution: true };
 
+const edgeTypes = { draggable: DraggableEdge };
+
+const defaultEdgeOptions = {
+  type: 'draggable',
+  animated: false,
+  data: {
+    sourceAnchor: { side: 'bottom', offset: 0.5 },
+    targetAnchor: { side: 'top', offset: 0.5 },
+  },
+};
+
+// ── Active Device Node ─────────────────────────────────────────────────
 function ActiveDeviceNode({ data, selected }) {
-  const Icon = iconMap[data.deviceType] || ServerIcon;
-  const statusColor = data.status === 'up' ? '#22c55e' : data.status === 'down' ? '#ef4444' : '#94a3b8';
+  const Icon = iconMap[data.deviceType?.toLowerCase()] || ServerIcon;
+  const statusColor = data.status === 'up' ? '#22c55e' : data.status === 'down' ? '#ef4444' : null;
+
   return (
-    <div className={`device-node ${selected ? 'selected' : ''}`} style={{ position: 'relative' }}>
-      <Handle id="top" type="target" position={Position.Top} className="node-handle" />
-      <Handle id="left" type="target" position={Position.Left} className="node-handle" />
-      {data.category === 'snmp' && (
+    <div className={`device-node ${selected ? 'selected' : ''}`} style={{ position: 'relative', minWidth: 110 }}>
+      <Handle id="top"    type="source" position={Position.Top}    className="node-handle" />
+      <Handle id="left"   type="source" position={Position.Left}   className="node-handle" />
+      {statusColor && (
         <div className="device-status-dot" style={{ background: statusColor }} title={`Status: ${data.status}`} />
       )}
       <div className="device-node-icon"><Icon size={48} /></div>
       <div className="device-node-label">{data.label}</div>
-      {data.linkLabel && <div className="device-link-label">{data.linkLabel}</div>}
       <Handle id="bottom" type="source" position={Position.Bottom} className="node-handle" />
-      <Handle id="right" type="source" position={Position.Right} className="node-handle" />
+      <Handle id="right"  type="source" position={Position.Right}  className="node-handle" />
     </div>
   );
 }
 
 const nodeTypes = { activeDevice: ActiveDeviceNode };
 
+// ── Interface Picker Modal ─────────────────────────────────────────────
 function InterfacePicker({ title, interfaces, onSelect, onClose }) {
+  const fmtSpeed = (s) => {
+    if (!s) return '';
+    const n = Number(s);
+    return n >= 1e9 ? `${(n / 1e9).toFixed(0)}G` : n >= 1e6 ? `${(n / 1e6).toFixed(0)}M` : `${n}M`;
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{title}</h2>
+          <h2 style={{ fontSize: '0.95rem' }}>{title}</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body iface-picker">
           {interfaces.length === 0 ? (
-            <div className="empty-state">No interfaces defined.</div>
+            <div className="empty-state">No interfaces defined for this device.</div>
           ) : (
             interfaces.map((iface, i) => (
               <button key={i} className="iface-pick-btn" onClick={() => onSelect(iface)}>
                 <span className="iface-pick-name">{iface.name}</span>
                 <span className="iface-pick-meta">
-                  {iface.speed ? `${(iface.speed / 1e6 || iface.speed).toFixed ? Number(iface.speed) >= 1e6 ? `${(iface.speed/1e6).toFixed(0)}Mbps` : `${iface.speed}Mbps` : `${iface.speed}Mbps`} · ` : ''}
+                  {fmtSpeed(iface.speed)}{iface.speed ? ' · ' : ''}
                   {iface.type || ''}
                   {iface.operStatus ? ` · ${iface.operStatus}` : ''}
                 </span>
@@ -56,7 +83,7 @@ function InterfacePicker({ title, interfaces, onSelect, onClose }) {
             ))
           )}
           <button className="iface-pick-btn iface-pick-skip" onClick={() => onSelect(null)}>
-            Skip (no interface label)
+            Skip — no interface label
           </button>
         </div>
       </div>
@@ -64,31 +91,37 @@ function InterfacePicker({ title, interfaces, onSelect, onClose }) {
   );
 }
 
-let nodeCounter = 1;
+let nodeCounter = 100;
 const getNodeId = () => `an_${nodeCounter++}`;
-let edgeCounter = 1;
-const getEdgeId = () => `ae_${edgeCounter++}`;
 
+// ── Main Component ─────────────────────────────────────────────────────
 export default function ActiveMapEditor() {
   const { mapId } = useParams();
   const navigate = useNavigate();
-  const [mapMeta, setMapMeta] = useState(null);
-  const [inventory, setInventory] = useState([]);
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [rfInstance, setRfInstance] = useState(null);
-  const [hasUnsaved, setHasUnsaved] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const isFirstRender = useRef(true);
-  const [pendingConnection, setPendingConnection] = useState(null);
-  const [pickerStep, setPickerStep] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const wrapperRef = useRef(null);
 
+  const [mapMeta, setMapMeta]         = useState(null);
+  const [inventory, setInventory]     = useState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [rfInstance, setRfInstance]   = useState(null);
+  const [hasUnsaved, setHasUnsaved]   = useState(false);
+  const [loading, setLoading]         = useState(true);
+  const [isSidebarOpen, setSidebarOpen] = useState(true);
+
+  // Interface picker state
+  const [pickerStep, setPickerStep]   = useState(null);
+
+  const isFirstRender = useRef(true);
+
+  // ── Load map + inventory ───────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
-        const [mapRes, devRes] = await Promise.all([api.get(`/maps/${mapId}`), api.get('/devices')]);
+        const [mapRes, devRes] = await Promise.all([
+          api.get(`/maps/${mapId}`),
+          api.get('/devices'),
+        ]);
         setMapMeta(mapRes.data);
         setInventory(devRes.data);
         if (mapRes.data.nodes?.length > 0) setNodes(mapRes.data.nodes);
@@ -104,14 +137,49 @@ export default function ActiveMapEditor() {
     setHasUnsaved(true);
   }, [nodes, edges]);
 
-  const handleSave = async () => {
+  // ── Save ──────────────────────────────────────────────────────────
+  const handleSave = useCallback(async () => {
     try {
       await api.put(`/maps/${mapId}`, { nodes, edges });
       setHasUnsaved(false);
     } catch (e) { console.error(e); }
-  };
+  }, [mapId, nodes, edges]);
 
-  const onDragOver = useCallback((e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }, []);
+  // ── Export PNG ────────────────────────────────────────────────────
+  const onExportPng = useCallback(() => {
+    const el = document.querySelector('.react-flow__renderer');
+    if (!el) return;
+    toPng(el, { backgroundColor: '#f1f5f9', pixelRatio: 2 }).then((dataUrl) => {
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `${mapMeta?.name || 'active-map'}.png`;
+      a.click();
+    });
+  }, [mapMeta]);
+
+  // ── Auto Layout ───────────────────────────────────────────────────
+  const onAutoLayout = useCallback(() => {
+    const { nodes: ln, edges: le } = getLayoutedElements(nodes, edges, 'TB');
+    setNodes([...ln]);
+    setEdges([...le]);
+    setTimeout(() => rfInstance?.fitView({ padding: 0.2 }), 50);
+  }, [nodes, edges, setNodes, setEdges, rfInstance]);
+
+  // ── Node double-click rename ───────────────────────────────────────
+  const onNodeDoubleClick = useCallback((_, node) => {
+    const newLabel = prompt('Rename device:', node.data.label);
+    if (newLabel?.trim()) {
+      setNodes((nds) => nds.map((n) =>
+        n.id === node.id ? { ...n, data: { ...n.data, label: newLabel.trim() } } : n
+      ));
+    }
+  }, [setNodes]);
+
+  // ── Drag from inventory sidebar ───────────────────────────────────
+  const onDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
 
   const onDrop = useCallback((e) => {
     e.preventDefault();
@@ -119,170 +187,215 @@ export default function ActiveMapEditor() {
     if (!raw || !rfInstance) return;
     const device = JSON.parse(raw);
     const position = rfInstance.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    const typeKey = device.type.toLowerCase();
-    const newNode = {
+    setNodes((nds) => nds.concat({
       id: getNodeId(),
       type: 'activeDevice',
       position,
       data: {
         label: device.name,
-        deviceType: typeKey,
+        deviceType: device.type?.toLowerCase() || 'server',
         deviceId: device.id,
         category: device.category,
         status: device.status,
         interfaces: device.interfaces || [],
       },
-    };
-    setNodes((nds) => nds.concat(newNode));
+    }));
   }, [rfInstance, setNodes]);
 
-  const onConnectStart = useCallback((_, { nodeId }) => {
-    setPendingConnection({ sourceNodeId: nodeId, sourceIface: null });
+  const onDragStartInventory = useCallback((e, device) => {
+    e.dataTransfer.setData('application/device-inventory', JSON.stringify(device));
+    e.dataTransfer.effectAllowed = 'move';
   }, []);
 
+  // ── Connection / Interface picker ─────────────────────────────────
   const onConnect = useCallback((params) => {
     const sourceNode = nodes.find((n) => n.id === params.source);
     const targetNode = nodes.find((n) => n.id === params.target);
     if (!sourceNode || !targetNode) return;
-
-    const sourceInterfaces = sourceNode.data.interfaces || [];
-    const targetInterfaces = targetNode.data.interfaces || [];
 
     setPickerStep({
       step: 'source',
       params,
       sourceNode,
       targetNode,
-      sourceInterfaces,
-      targetInterfaces,
       sourceIface: null,
     });
   }, [nodes]);
 
-  const handleSourceIfaceSelect = (iface) => {
+  const handleSourceIfaceSelect = useCallback((iface) => {
     setPickerStep((prev) => ({ ...prev, step: 'target', sourceIface: iface }));
-  };
+  }, []);
 
-  const handleTargetIfaceSelect = (iface) => {
-    const { params, sourceIface, targetInterfaces } = pickerStep;
-    const srcLabel = sourceIface ? sourceIface.name : '';
-    const tgtLabel = iface ? iface.name : '';
-    const label = [srcLabel, tgtLabel].filter(Boolean).join(' ↔ ');
+  const handleTargetIfaceSelect = useCallback((iface) => {
+    const { params, sourceIface } = pickerStep;
+    const srcLabel = sourceIface?.name || '';
+    const tgtLabel = iface?.name || '';
+    const linkLabel = [srcLabel, tgtLabel].filter(Boolean).join(' ↔ ') || null;
 
     setEdges((eds) => addEdge({
       ...params,
-      id: getEdgeId(),
-      label,
-      labelStyle: { fill: '#fff', fontSize: 10, fontFamily: 'monospace' },
-      labelBgStyle: { fill: '#1e293b', fillOpacity: 0.85 },
-      style: { stroke: '#f59e0b', strokeWidth: 2 },
-      data: { sourceIface: sourceIface?.name, targetIface: iface?.name },
+      type: 'draggable',
+      data: {
+        sourceAnchor: { side: 'bottom', offset: 0.5 },
+        targetAnchor: { side: 'top', offset: 0.5 },
+        sourceIface: sourceIface?.name || null,
+        targetIface: iface?.name || null,
+        linkLabel,
+        color: '#f59e0b',
+      },
     }, eds));
+
     setPickerStep(null);
-    setPendingConnection(null);
-  };
+  }, [pickerStep, setEdges]);
 
-  const cancelPicker = () => { setPickerStep(null); setPendingConnection(null); };
+  const cancelPicker = useCallback(() => setPickerStep(null), []);
 
-  const onDragStartInventory = (e, device) => {
-    e.dataTransfer.setData('application/device-inventory', JSON.stringify(device));
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const onPollAll = async () => {
+  // ── Poll all SNMP ─────────────────────────────────────────────────
+  const onPollAll = useCallback(async () => {
     try {
       const res = await api.post('/devices/poll-all');
       const updated = res.data.devices;
+      setInventory((prev) => prev.map((d) => updated.find((u) => u.id === d.id) || d));
       setNodes((nds) => nds.map((n) => {
         const dev = updated.find((d) => d.id === n.data.deviceId);
-        if (!dev) return n;
-        return { ...n, data: { ...n.data, status: dev.status, interfaces: dev.interfaces || n.data.interfaces } };
+        return dev ? { ...n, data: { ...n.data, status: dev.status, interfaces: dev.interfaces || n.data.interfaces } } : n;
       }));
-      setInventory((prev) => prev.map((d) => { const u = updated.find((x) => x.id === d.id); return u || d; }));
     } catch (e) { console.error(e); }
-  };
+  }, [setNodes]);
 
-  const addedDeviceIds = new Set(nodes.map((n) => n.data.deviceId).filter(Boolean));
+  const addedDeviceIds = useMemo(
+    () => new Set(nodes.map((n) => n.data?.deviceId).filter(Boolean)),
+    [nodes]
+  );
 
   if (loading) return <div className="page-loading">Loading active map…</div>;
 
   return (
     <div className="editor-layout">
+      {/* ── Top Bar ── */}
       <div className="editor-topbar">
         <button className="back-btn" onClick={() => navigate('/maps')}>← Maps</button>
         <span className="editor-title">{mapMeta?.name}</span>
         <span className="map-type-pill active">Active Map</span>
         <div className="topbar-actions">
+          <button className="btn-sm" onClick={onAutoLayout} title="Auto arrange nodes">Auto Layout</button>
+          <button className="btn-sm" onClick={onPollAll} title="Re-poll all SNMP devices">Refresh SNMP</button>
+          <button className="btn-sm" onClick={onExportPng} title="Export canvas as PNG">Export PNG</button>
           {hasUnsaved && <span className="unsaved-dot" title="Unsaved changes">●</span>}
-          <button className="btn-sm" onClick={onPollAll}>Refresh SNMP</button>
           <button className="btn-primary btn-sm" onClick={handleSave}>Save Map</button>
         </div>
       </div>
 
       <div className="editor-body">
+        {/* ── Inventory Sidebar ── */}
         <div className={`active-sidebar ${isSidebarOpen ? '' : 'collapsed'}`}>
           <div className="active-sidebar-header">
-            <span>Device Inventory</span>
-            <button className="sidebar-toggle-btn" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>{isSidebarOpen ? '‹' : '›'}</button>
+            {isSidebarOpen && <span>Device Inventory</span>}
+            <button
+              className="sidebar-toggle-btn"
+              onClick={() => setSidebarOpen(!isSidebarOpen)}
+              title={isSidebarOpen ? 'Collapse' : 'Expand'}
+            >
+              {isSidebarOpen ? '‹' : '›'}
+            </button>
           </div>
+
           {isSidebarOpen && (
             <div className="active-sidebar-list">
-              {inventory.length === 0 && <div className="empty-state small">No devices in inventory.<br/>Add devices first.</div>}
-              {inventory.map((device) => {
-                const Icon = iconMap[device.type?.toLowerCase()] || ServerIcon;
-                const inUse = addedDeviceIds.has(device.id);
-                return (
-                  <div
-                    key={device.id}
-                    className={`inv-device ${inUse ? 'in-use' : ''}`}
-                    draggable={!inUse}
-                    onDragStart={!inUse ? (e) => onDragStartInventory(e, device) : undefined}
-                    title={inUse ? 'Already on canvas' : `Drag to canvas: ${device.name}`}
-                  >
-                    <div className="inv-device-icon"><Icon size={28} /></div>
-                    <div className="inv-device-info">
-                      <span className="inv-device-name">{device.name}</span>
-                      <span className="inv-device-meta">{device.type} · {device.category === 'snmp' ? device.ip : 'custom'}</span>
+              {inventory.length === 0 ? (
+                <div className="empty-state small">
+                  No devices in inventory.<br />
+                  Add devices on the Devices page first.
+                </div>
+              ) : (
+                inventory.map((device) => {
+                  const Icon = iconMap[device.type?.toLowerCase()] || ServerIcon;
+                  const inUse = addedDeviceIds.has(device.id);
+                  return (
+                    <div
+                      key={device.id}
+                      className={`inv-device ${inUse ? 'in-use' : ''}`}
+                      draggable={!inUse}
+                      onDragStart={!inUse ? (e) => onDragStartInventory(e, device) : undefined}
+                      title={inUse ? `${device.name} is already on the canvas` : `Drag ${device.name} onto the canvas`}
+                    >
+                      <div className="inv-device-icon"><Icon size={26} /></div>
+                      <div className="inv-device-info">
+                        <span className="inv-device-name">{device.name}</span>
+                        <span className="inv-device-meta">
+                          {device.type}
+                          {device.category === 'snmp' ? ` · ${device.ip}` : ' · custom'}
+                        </span>
+                      </div>
+                      {device.category === 'snmp' && (
+                        <div className={`inv-status-dot status-${device.status || 'unknown'}`} title={device.status} />
+                      )}
+                      {inUse && <span className="inv-in-use-badge">On map</span>}
                     </div>
-                    {device.category === 'snmp' && (
-                      <div className={`inv-status-dot status-${device.status}`} title={device.status} />
-                    )}
-                    {inUse && <div className="inv-in-use-badge">On map</div>}
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           )}
         </div>
 
+        {/* ── Canvas ── */}
         <div className="canvas-container" ref={wrapperRef}>
           <ReactFlow
-            nodes={nodes} edges={edges}
-            onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
-            onConnect={onConnect} onConnectStart={onConnectStart}
-            onInit={setRfInstance} onDrop={onDrop} onDragOver={onDragOver}
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onInit={setRfInstance}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onNodeDoubleClick={onNodeDoubleClick}
             nodeTypes={nodeTypes}
-            fitView fitViewOptions={{ padding: 0.2 }}
-            snapToGrid snapGrid={[20, 20]}
+            edgeTypes={edgeTypes}
+            defaultEdgeOptions={defaultEdgeOptions}
+            fitView
+            fitViewOptions={{ padding: 0.2 }}
+            snapToGrid
+            snapGrid={[20, 20]}
             proOptions={proOptions}
             deleteKeyCode={['Delete', 'Backspace']}
             connectionLineType="smoothstep"
           >
             <Controls position="bottom-right" className="flow-controls" />
-            <MiniMap position="bottom-right" style={{ marginBottom: 50 }}
-              maskColor="rgba(0,0,0,0.08)" className="flow-minimap"
+            <MiniMap
+              position="bottom-right"
+              style={{ marginBottom: 50 }}
+              nodeColor={(n) => {
+                if (n.data?.status === 'up') return '#22c55e44';
+                if (n.data?.status === 'down') return '#ef444444';
+                return '#64748b44';
+              }}
+              maskColor="rgba(0,0,0,0.08)"
+              className="flow-minimap"
             />
             <Background variant="dots" gap={20} size={1} color="#d1d5db" />
             <Panel position="top-right" className="canvas-panel">
-              <div className="canvas-badge"><span className="canvas-badge-dot active"></span>{mapMeta?.name}</div>
+              <div className="canvas-badge">
+                <span className="canvas-badge-dot active"></span>
+                {mapMeta?.name}
+              </div>
             </Panel>
+
             {nodes.length === 0 && (
               <Panel position="center">
                 <div className="drop-hint">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.3 }}>
-                    <path d="M12 5v14M5 12l7-7 7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  <svg width="56" height="56" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.25, margin: '0 auto', display: 'block' }}>
+                    <rect x="3" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                    <rect x="15" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                    <rect x="9" y="15" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                    <line x1="6" y1="9" x2="12" y2="15" stroke="currentColor" strokeWidth="1.3"/>
+                    <line x1="18" y1="9" x2="12" y2="15" stroke="currentColor" strokeWidth="1.3"/>
                   </svg>
-                  <p>Drag devices from the inventory panel to start mapping</p>
+                  <p>Drag devices from the inventory panel onto the canvas</p>
+                  <p style={{ fontSize: '0.78rem', marginTop: 4, opacity: 0.6 }}>
+                    Connect nodes to pick interfaces for each link
+                  </p>
                 </div>
               </Panel>
             )}
@@ -290,18 +403,19 @@ export default function ActiveMapEditor() {
         </div>
       </div>
 
+      {/* ── Interface Pickers ── */}
       {pickerStep?.step === 'source' && (
         <InterfacePicker
-          title={`${pickerStep.sourceNode.data.label} — Select Source Interface`}
-          interfaces={pickerStep.sourceInterfaces}
+          title={`${pickerStep.sourceNode.data.label} — Source Interface`}
+          interfaces={pickerStep.sourceNode.data.interfaces || []}
           onSelect={handleSourceIfaceSelect}
           onClose={cancelPicker}
         />
       )}
       {pickerStep?.step === 'target' && (
         <InterfacePicker
-          title={`${pickerStep.targetNode.data.label} — Select Target Interface`}
-          interfaces={pickerStep.targetInterfaces}
+          title={`${pickerStep.targetNode.data.label} — Target Interface`}
+          interfaces={pickerStep.targetNode.data.interfaces || []}
           onSelect={handleTargetIfaceSelect}
           onClose={cancelPicker}
         />

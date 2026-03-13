@@ -1,1 +1,96 @@
-[]
+[
+  {
+    "id": "8f36640c-3445-4ba3-bad3-2177b16fa149",
+    "name": "EXSi-Node-01",
+    "type": "server",
+    "category": "custom",
+    "ip": "",
+    "community": "public",
+    "snmpVersion": "v2c",
+    "interfaces": [
+      {
+        "name": "eth0",
+        "speed": 1000,
+        "type": "copper",
+        "operStatus": "up",
+        "adminStatus": "up"
+      },
+      {
+        "name": "eth1",
+        "speed": 1000,
+        "type": "copper",
+        "operStatus": "up",
+        "adminStatus": "up"
+      },
+      {
+        "name": "eth2",
+        "speed": 1000,
+        "type": "copper",
+        "operStatus": "up",
+        "adminStatus": "up"
+      },
+      {
+        "name": "eth3",
+        "speed": 1000,
+        "type": "copper",
+        "operStatus": "up",
+        "adminStatus": "up"
+      }
+    ],
+    "location": "DC-01",
+    "description": "",
+    "status": "unknown",
+    "lastPolled": null,
+    "sysDescr": "",
+    "sysName": "",
+    "uptime": 0,
+    "createdAt": "2026-03-13T16:06:53.522Z"
+  },
+  {
+    "id": "9e507f87-bd01-4282-a7f1-5cda2f7134a7",
+    "name": "EXSi-Node-02",
+    "type": "server",
+    "category": "custom",
+    "ip": "",
+    "community": "public",
+    "snmpVersion": "v2c",
+    "interfaces": [
+      {
+        "name": "eth0",
+        "speed": 1000,
+        "type": "copper",
+        "operStatus": "up",
+        "adminStatus": "up"
+      },
+      {
+        "name": "eth1",
+        "speed": 1000,
+        "type": "copper",
+        "operStatus": "up",
+        "adminStatus": "up"
+      },
+      {
+        "name": "eth2",
+        "speed": 1000,
+        "type": "copper",
+        "operStatus": "up",
+        "adminStatus": "up"
+      },
+      {
+        "name": "eth3",
+        "speed": 1000,
+        "type": "copper",
+        "operStatus": "up",
+        "adminStatus": "up"
+      }
+    ],
+    "location": "DC-01",
+    "description": "",
+    "status": "unknown",
+    "lastPolled": null,
+    "sysDescr": "",
+    "sysName": "",
+    "uptime": 0,
+    "createdAt": "2026-03-13T16:07:19.191Z"
+  }
+]
