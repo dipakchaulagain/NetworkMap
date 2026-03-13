@@ -311,6 +311,32 @@ body,
   border-color: rgba(239, 68, 68, 0.5);
 }
 
+.toolbar-btn.save.has-unsaved {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+.toolbar-btn.save.has-unsaved:hover {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.6);
+}
+
+.toolbar-btn.save.saved {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.toolbar-btn.save.saved:hover {
+  background: rgba(74, 222, 128, 0.08);
+  border-color: rgba(74, 222, 128, 0.4);
+}
+
+.toolbar-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 2px 0;
+}
+
 .toolbar-footer {
   margin-top: auto;
   padding: 16px 20px;

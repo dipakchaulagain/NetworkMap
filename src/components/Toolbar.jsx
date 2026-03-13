@@ -11,7 +11,7 @@ const iconComponents = {
     network: NetworkTreeIcon,
 };
 
-const Toolbar = ({ onAutoLayout, onAddGroup, onExport, onImport, onClear }) => {
+const Toolbar = ({ onAutoLayout, onAddGroup, onSave, hasUnsaved, onExportPng, onExport, onImport, onClear }) => {
     const [collapsed, setCollapsed] = useState(false);
 
     const onDragStart = (event, deviceType) => {
@@ -97,13 +97,39 @@ const Toolbar = ({ onAutoLayout, onAddGroup, onExport, onImport, onClear }) => {
                                 </svg>
                                 Add Group
                             </button>
-                            <button className="toolbar-btn" onClick={onExport} title="Export diagram JSON">
+
+                            <div className="toolbar-divider" />
+
+                            <button
+                                className={`toolbar-btn save ${hasUnsaved ? 'has-unsaved' : 'saved'}`}
+                                onClick={onSave}
+                                title="Save diagram to browser storage"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                    <path d="M2 2h9l3 3v9a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                                    <rect x="5" y="9" width="6" height="5" rx="0.5" stroke="currentColor" strokeWidth="1.2" />
+                                    <rect x="5" y="2" width="5" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.2" />
+                                </svg>
+                                {hasUnsaved ? 'Save Diagram ●' : 'Saved ✓'}
+                            </button>
+
+                            <button className="toolbar-btn" onClick={onExportPng} title="Export diagram as PNG image">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                    <rect x="1" y="1" width="14" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+                                    <circle cx="5" cy="5" r="1.5" stroke="currentColor" strokeWidth="1.2" />
+                                    <path d="M1 10l3.5-3.5 3 3 2.5-2.5L15 12" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                                    <line x1="8" y1="13" x2="8" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                    <line x1="5" y1="15" x2="11" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                </svg>
+                                Export PNG
+                            </button>
+                            <button className="toolbar-btn" onClick={onExport} title="Export diagram as JSON">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                     <path d="M2 10v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                                     <line x1="8" y1="2" x2="8" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                                     <polyline points="5,7 8,10 11,7" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
-                                Export
+                                Export JSON
                             </button>
                             <button className="toolbar-btn" onClick={onImport} title="Import diagram JSON">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -111,7 +137,7 @@ const Toolbar = ({ onAutoLayout, onAddGroup, onExport, onImport, onClear }) => {
                                     <line x1="8" y1="10" x2="8" y2="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                                     <polyline points="5,5 8,2 11,5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
-                                Import
+                                Import JSON
                             </button>
                             <button className="toolbar-btn danger" onClick={onClear} title="Clear canvas">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

@@ -11,6 +11,7 @@ import {
   Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { toPng } from 'html-to-image';
 
 import DeviceNode from './nodes/DeviceNode';
 import GroupNode from './nodes/GroupNode';
@@ -64,18 +65,40 @@ function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState(savedDiagram?.nodes ?? sampleNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(savedDiagram?.edges ?? sampleEdges);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
+  const [hasUnsaved, setHasUnsaved] = useState(false);
+  const isFirstRender = useRef(true);
 
-  // Auto-save to localStorage on every change
+  // Track unsaved changes (skip the very first render so loading doesn't mark as unsaved)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges }));
-      } catch (e) {
-        console.warn('Failed to save diagram:', e);
-      }
-    }, 300); // debounce 300ms
-    return () => clearTimeout(timer);
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setHasUnsaved(true);
   }, [nodes, edges]);
+
+  const onSave = useCallback(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges }));
+      setHasUnsaved(false);
+    } catch (e) {
+      console.warn('Failed to save diagram:', e);
+    }
+  }, [nodes, edges]);
+
+  const onExportPng = useCallback(() => {
+    const el = document.querySelector('.react-flow__renderer');
+    if (!el) return;
+    toPng(el, {
+      backgroundColor: '#f1f5f9',
+      pixelRatio: 2,
+    }).then((dataUrl) => {
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'networkmap-diagram.png';
+      a.click();
+    }).catch((err) => console.error('PNG export failed:', err));
+  }, []);
 
   const onConnect = useCallback(
     (params) => {
@@ -223,6 +246,9 @@ function App() {
       <Toolbar
         onAutoLayout={onAutoLayout}
         onAddGroup={onAddGroup}
+        onSave={onSave}
+        hasUnsaved={hasUnsaved}
+        onExportPng={onExportPng}
         onExport={onExport}
         onImport={onImport}
         onClear={onClear}
