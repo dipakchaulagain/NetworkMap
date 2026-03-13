@@ -72,20 +72,6 @@ const DraggableEdge = ({
   }, [waypoints]);
 
   const [segmentDragging, setSegmentDragging] = useState(null); // index of segment being dragged
-  const segmentDragStartRef = useRef(null);
-  const initialWaypointsRef = useRef(null);
-
-  const updateWaypoints = useCallback(
-    (newWaypoints) => {
-      setEdges((eds) =>
-        eds.map((e) => {
-          if (e.id !== id) return e;
-          return { ...e, data: { ...e.data, customWaypoints: newWaypoints } };
-        })
-      );
-    },
-    [id, setEdges]
-  );
 
   const updateAnchor = useCallback(
     (endpoint, newAnchor) => {
@@ -147,41 +133,38 @@ const DraggableEdge = ({
     };
   }, [dragging, sourceNode, targetNode, updateAnchor, screenToFlowPosition]);
 
-  // We only need the zoom level to convert screen pixels to flow pixels
-  const { zoom } = useReactFlow().getViewport();
+  const { getViewport } = useReactFlow();
 
   // Segment dragging effect
   useEffect(() => {
     if (segmentDragging === null) return;
 
     const handleMouseMove = (e) => {
-      // movementX/Y gives physical screen pixels, we divide by zoom to get flow pixels
+      // Always read current zoom so it stays accurate after zoom changes
+      const { zoom } = getViewport();
       const dx = e.movementX / zoom;
       const dy = e.movementY / zoom;
 
-      // We mutate a copy of the current custom waypoints
-      updateWaypoints((prevEds) => {
-        const targetEdge = prevEds.find(ed => ed.id === id);
-        if (!targetEdge) return prevEds;
+      // Use setEdges functional updater to always operate on the latest edge state
+      setEdges((eds) => {
+        const targetEdge = eds.find(ed => ed.id === id);
+        if (!targetEdge) return eds;
 
-        // Ensure we have a fresh copy of the waypoints
         const currentData = targetEdge.data || {};
-        const newWaypoints = currentData.customWaypoints ? [...currentData.customWaypoints] : [...waypoints];
+        // Use saved customWaypoints if present, otherwise snapshot the auto-computed ones
+        const base = currentData.customWaypoints?.length ? currentData.customWaypoints : waypoints;
+        const newWaypoints = base.map(p => ({ ...p }));
 
-        if (!newWaypoints || newWaypoints.length <= segmentDragging + 1) return prevEds;
+        if (newWaypoints.length <= segmentDragging + 1) return eds;
 
-        const p1 = { ...newWaypoints[segmentDragging] };
-        const p2 = { ...newWaypoints[segmentDragging + 1] };
-
-        const isHorizontal = Math.abs(p1.y - p2.y) < 0.1;
+        const p1 = newWaypoints[segmentDragging];
+        const p2 = newWaypoints[segmentDragging + 1];
+        const isHorizontal = Math.abs(p1.y - p2.y) < 0.5;
 
         if (isHorizontal) {
-          // Dragging horizontal segment up/down
+          // Move horizontal segment up/down; keep adjacent vertical segments connected
           p1.y += dy;
           p2.y += dy;
-          newWaypoints[segmentDragging] = p1;
-          newWaypoints[segmentDragging + 1] = p2;
-          
           if (segmentDragging > 0) {
             newWaypoints[segmentDragging - 1] = { ...newWaypoints[segmentDragging - 1], y: p1.y };
           }
@@ -189,12 +172,9 @@ const DraggableEdge = ({
             newWaypoints[segmentDragging + 2] = { ...newWaypoints[segmentDragging + 2], y: p2.y };
           }
         } else {
-          // Dragging vertical segment left/right
+          // Move vertical segment left/right; keep adjacent horizontal segments connected
           p1.x += dx;
           p2.x += dx;
-          newWaypoints[segmentDragging] = p1;
-          newWaypoints[segmentDragging + 1] = p2;
-
           if (segmentDragging > 0) {
             newWaypoints[segmentDragging - 1] = { ...newWaypoints[segmentDragging - 1], x: p1.x };
           }
@@ -203,7 +183,7 @@ const DraggableEdge = ({
           }
         }
 
-        return prevEds.map(ed => 
+        return eds.map(ed =>
           ed.id === id ? { ...ed, data: { ...ed.data, customWaypoints: newWaypoints } } : ed
         );
       });
@@ -220,28 +200,15 @@ const DraggableEdge = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [segmentDragging, id, updateWaypoints, waypoints]); // re-bind safely
+  }, [segmentDragging, id, setEdges, waypoints, getViewport]);
 
   const handleSegmentMouseDown = useCallback(
     (index) => (e) => {
       e.stopPropagation();
       e.preventDefault();
       setSegmentDragging(index);
-      
-      // If the edge doesn't have customWaypoints saved yet, initialize them immediately from the 
-      // standard auto-generated waypoints so the upcoming mousemove delta has a starting point.
-      if (!data?.customWaypoints || data.customWaypoints.length === 0) {
-         setEdges((eds) =>
-          eds.map((ed) => {
-            if (ed.id === id) {
-              return { ...ed, data: { ...ed.data, customWaypoints: [...waypoints] } };
-            }
-            return ed;
-          })
-        );
-      }
     },
-    [waypoints, data?.customWaypoints, id, setEdges]
+    []
   );
 
   // Guard render — all hooks are already called above
