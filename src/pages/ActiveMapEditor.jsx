@@ -354,6 +354,7 @@ export default function ActiveMapEditor() {
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
+            connectionMode="loose"
             fitView
             fitViewOptions={{ padding: 0.2 }}
             snapToGrid
