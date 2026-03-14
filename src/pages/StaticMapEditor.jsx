@@ -136,17 +136,19 @@ export default function StaticMapEditor() {
         <button className="back-btn" onClick={() => navigate('/maps')}>← Maps</button>
         <span className="editor-title">{mapMeta?.name}</span>
         <span className="map-type-pill static">Static Map</span>
-        <div className="mode-toggle">
-          <button
-            className={mode === 'view' ? 'active' : ''}
-            onClick={() => setMode('view')}
-          >View</button>
-          <button
-            className={mode === 'edit' ? 'active' : ''}
-            onClick={() => setMode('edit')}
-          >Edit</button>
+        <div className="topbar-actions">
+          <div className="mode-toggle" style={{marginLeft:0}}>
+            <button
+              className={mode === 'view' ? 'active' : ''}
+              onClick={() => setMode('view')}
+            >View</button>
+            <button
+              className={mode === 'edit' ? 'active' : ''}
+              onClick={() => setMode('edit')}
+            >Edit</button>
+          </div>
+          {mode === 'edit' && hasUnsaved && <span className="unsaved-dot" title="Unsaved changes">●</span>}
         </div>
-        {mode === 'edit' && hasUnsaved && <span className="unsaved-dot" title="Unsaved changes">●</span>}
       </div>
       <div className="editor-body">
         {mode === 'edit' && (
