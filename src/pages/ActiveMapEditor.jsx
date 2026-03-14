@@ -119,24 +119,56 @@ export default function ActiveMapEditor() {
   const [pickerStep, setPickerStep]   = useState(null);
 
   const isFirstRender = useRef(true);
+  const [pollInterval, setPollInterval] = useState(60);
 
-  // ── Load map + inventory ───────────────────────────────────────────
+  // ── Compute edge color from node interface status ──────────────────
+  const computeEdgeColors = useCallback((edgeList, nodeList) => {
+    return edgeList.map((edge) => {
+      const srcNode = nodeList.find((n) => n.id === edge.source);
+      const tgtNode = nodeList.find((n) => n.id === edge.target);
+
+      const getIfaceStatus = (node, ifaceName) => {
+        if (!node || node.data?.category !== 'snmp') return null;
+        if (!ifaceName) return null;
+        const iface = (node.data.interfaces || []).find((i) => i.name === ifaceName);
+        return iface?.operStatus || null;
+      };
+
+      const srcStatus = getIfaceStatus(srcNode, edge.data?.sourceIface);
+      const tgtStatus = getIfaceStatus(tgtNode, edge.data?.targetIface);
+      const statuses = [srcStatus, tgtStatus].filter(Boolean);
+
+      let color = edge.data?.color || '#f59e0b';
+      if (statuses.length > 0) {
+        if (statuses.every((s) => s === 'up'))   color = '#22c55e';
+        else if (statuses.some((s) => s === 'down')) color = '#ef4444';
+        else color = '#f59e0b';
+      }
+      return color === edge.data?.color ? edge : { ...edge, data: { ...edge.data, color } };
+    });
+  }, []);
+
+  // ── Load map + inventory + settings ───────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
-        const [mapRes, devRes] = await Promise.all([
+        const [mapRes, devRes, settRes] = await Promise.all([
           api.get(`/maps/${mapId}`),
           api.get('/devices'),
+          api.get('/settings'),
         ]);
         setMapMeta(mapRes.data);
         setInventory(devRes.data);
-        if (mapRes.data.nodes?.length > 0) setNodes(mapRes.data.nodes);
-        if (mapRes.data.edges?.length > 0) setEdges(mapRes.data.edges);
+        setPollInterval(settRes.data.snmpPollInterval ?? 60);
+        const loadedNodes = mapRes.data.nodes?.length > 0 ? mapRes.data.nodes : [];
+        const loadedEdges = mapRes.data.edges?.length > 0 ? mapRes.data.edges : [];
+        if (loadedNodes.length > 0) setNodes(loadedNodes);
+        if (loadedEdges.length > 0) setEdges(computeEdgeColors(loadedEdges, loadedNodes));
       } catch (e) { console.error(e); }
       setLoading(false);
     };
     load();
-  }, [mapId]);
+  }, [mapId, computeEdgeColors]);
 
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
@@ -289,12 +321,24 @@ export default function ActiveMapEditor() {
       const res = await api.post('/devices/poll-all');
       const updated = res.data.devices;
       setInventory((prev) => prev.map((d) => updated.find((u) => u.id === d.id) || d));
-      setNodes((nds) => nds.map((n) => {
-        const dev = updated.find((d) => d.id === n.data.deviceId);
-        return dev ? { ...n, data: { ...n.data, status: dev.status, interfaces: dev.interfaces || n.data.interfaces } } : n;
-      }));
+      setNodes((nds) => {
+        const newNodes = nds.map((n) => {
+          const dev = updated.find((d) => d.id === n.data.deviceId);
+          return dev ? { ...n, data: { ...n.data, status: dev.status, interfaces: dev.interfaces || n.data.interfaces } } : n;
+        });
+        // Recolor edges based on fresh interface data
+        setEdges((eds) => computeEdgeColors(eds, newNodes));
+        return newNodes;
+      });
     } catch (e) { console.error(e); }
-  }, [setNodes]);
+  }, [setNodes, setEdges, computeEdgeColors]);
+
+  // ── Auto-poll on interval ─────────────────────────────────────────
+  useEffect(() => {
+    if (!pollInterval || pollInterval <= 0) return;
+    const id = setInterval(onPollAll, pollInterval * 1000);
+    return () => clearInterval(id);
+  }, [pollInterval, onPollAll]);
 
   const addedDeviceIds = useMemo(
     () => new Set(nodes.map((n) => n.data?.deviceId).filter(Boolean)),

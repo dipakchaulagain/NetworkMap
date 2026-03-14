@@ -8,6 +8,7 @@ import Maps from './pages/Maps';
 import StaticMapEditor from './pages/StaticMapEditor';
 import ActiveMapEditor from './pages/ActiveMapEditor';
 import UserManagement from './pages/UserManagement';
+import Settings from './pages/Settings';
 import './App.css';
 
 function ProtectedRoute({ children }) {
@@ -31,6 +32,7 @@ function AppRoutes() {
       <Route path="/devices" element={<ProtectedRoute><Devices /></ProtectedRoute>} />
       <Route path="/maps" element={<ProtectedRoute><Maps /></ProtectedRoute>} />
       <Route path="/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/maps/:mapId/static" element={<ProtectedEditorRoute><StaticMapEditor /></ProtectedEditorRoute>} />
       <Route path="/maps/:mapId/active" element={<ProtectedEditorRoute><ActiveMapEditor /></ProtectedEditorRoute>} />
       <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />

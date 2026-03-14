@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import deviceRoutes from './routes/devices.js';
 import mapRoutes from './routes/maps.js';
+import settingsRoutes from './routes/settings.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/maps', mapRoutes);
+app.use('/api/settings', settingsRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
