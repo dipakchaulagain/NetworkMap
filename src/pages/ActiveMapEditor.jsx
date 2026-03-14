@@ -10,6 +10,7 @@ import api from '../api/client';
 import DraggableEdge from '../edges/DraggableEdge';
 import { getLayoutedElements } from '../utils/layoutEngine';
 import { CloudIcon, RouterIcon, SwitchIcon, FirewallIcon, ServerIcon, NetworkTreeIcon } from '../icons';
+import { MapModeContext } from '../context/MapModeContext';
 
 const iconMap = {
   router: RouterIcon, switch: SwitchIcon, firewall: FirewallIcon,
@@ -124,6 +125,12 @@ export default function ActiveMapEditor() {
   // ── Compute edge color from node interface status ──────────────────
   // SNMP nodes  → use operStatus  (live hardware state)
   // Custom nodes → use adminStatus (manually set by user)
+  //
+  // Color rules:
+  //   Any endpoint down           → red   (#ef4444)
+  //   Both up, at least 1 SNMP   → green (#22c55e)
+  //   Both up, custom-only link  → orange (#f59e0b)
+  //   No interface assigned      → keep stored color / amber default
   const computeEdgeColors = useCallback((edgeList, nodeList) => {
     return edgeList.map((edge) => {
       const srcNode = nodeList.find((n) => n.id === edge.source);
@@ -142,11 +149,13 @@ export default function ActiveMapEditor() {
       const tgtStatus = getIfaceStatus(tgtNode, edge.data?.targetIface);
       const statuses  = [srcStatus, tgtStatus].filter(Boolean);
 
-      let color = '#f59e0b';
+      const hasSNMP = srcNode?.data?.category === 'snmp' || tgtNode?.data?.category === 'snmp';
+
+      let color;
       if (statuses.length > 0) {
-        if (statuses.every((s) => s === 'up'))      color = '#22c55e';
-        else if (statuses.some((s) => s === 'down')) color = '#ef4444';
-        else                                          color = '#f59e0b';
+        if (statuses.some((s) => s === 'down'))    color = '#ef4444';
+        else if (statuses.every((s) => s === 'up')) color = hasSNMP ? '#22c55e' : '#f59e0b';
+        else                                         color = '#f59e0b';
       } else {
         color = edge.data?.color || '#f59e0b';
       }
@@ -375,6 +384,7 @@ export default function ActiveMapEditor() {
   if (loading) return <div className="page-loading">Loading active map…</div>;
 
   return (
+    <MapModeContext.Provider value={{ mode, nodes }}>
     <div className="editor-layout">
       {/* ── Top Bar ── */}
       <div className="editor-topbar">
@@ -536,5 +546,6 @@ export default function ActiveMapEditor() {
         />
       )}
     </div>
+    </MapModeContext.Provider>
   );
 }
