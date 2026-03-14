@@ -122,28 +122,35 @@ export default function ActiveMapEditor() {
   const [pollInterval, setPollInterval] = useState(60);
 
   // ── Compute edge color from node interface status ──────────────────
+  // SNMP nodes  → use operStatus  (live hardware state)
+  // Custom nodes → use adminStatus (manually set by user)
   const computeEdgeColors = useCallback((edgeList, nodeList) => {
     return edgeList.map((edge) => {
       const srcNode = nodeList.find((n) => n.id === edge.source);
       const tgtNode = nodeList.find((n) => n.id === edge.target);
 
       const getIfaceStatus = (node, ifaceName) => {
-        if (!node || node.data?.category !== 'snmp') return null;
-        if (!ifaceName) return null;
-        const iface = (node.data.interfaces || []).find((i) => i.name === ifaceName);
-        return iface?.operStatus || null;
+        if (!node || !ifaceName) return null;
+        const iface = (node.data?.interfaces || []).find((i) => i.name === ifaceName);
+        if (!iface) return null;
+        if (node.data?.category === 'snmp')   return iface.operStatus  || null;
+        if (node.data?.category === 'custom') return iface.adminStatus || null;
+        return null;
       };
 
       const srcStatus = getIfaceStatus(srcNode, edge.data?.sourceIface);
       const tgtStatus = getIfaceStatus(tgtNode, edge.data?.targetIface);
-      const statuses = [srcStatus, tgtStatus].filter(Boolean);
+      const statuses  = [srcStatus, tgtStatus].filter(Boolean);
 
-      let color = edge.data?.color || '#f59e0b';
+      let color = '#f59e0b';
       if (statuses.length > 0) {
-        if (statuses.every((s) => s === 'up'))   color = '#22c55e';
+        if (statuses.every((s) => s === 'up'))      color = '#22c55e';
         else if (statuses.some((s) => s === 'down')) color = '#ef4444';
-        else color = '#f59e0b';
+        else                                          color = '#f59e0b';
+      } else {
+        color = edge.data?.color || '#f59e0b';
       }
+
       return color === edge.data?.color ? edge : { ...edge, data: { ...edge.data, color } };
     });
   }, []);
@@ -315,18 +322,38 @@ export default function ActiveMapEditor() {
 
   const cancelPicker = useCallback(() => setPickerStep(null), []);
 
-  // ── Poll all SNMP ─────────────────────────────────────────────────
+  // ── Poll all SNMP + refresh all device data (incl. custom nodes) ──
   const onPollAll = useCallback(async () => {
     try {
-      const res = await api.post('/devices/poll-all');
-      const updated = res.data.devices;
-      setInventory((prev) => prev.map((d) => updated.find((u) => u.id === d.id) || d));
+      // Fire SNMP poll and a full device refresh in parallel
+      const [pollRes, allRes] = await Promise.all([
+        api.post('/devices/poll-all'),
+        api.get('/devices'),
+      ]);
+
+      // Merge: SNMP results are authoritative for SNMP devices;
+      // all other fields (e.g. custom node adminStatus) come from allRes
+      const snmpUpdated = pollRes.data.devices;
+      const allDevices  = allRes.data.map((d) => {
+        const snmpVersion = snmpUpdated.find((u) => u.id === d.id);
+        return snmpVersion || d;
+      });
+
+      setInventory(allDevices);
+
       setNodes((nds) => {
         const newNodes = nds.map((n) => {
-          const dev = updated.find((d) => d.id === n.data.deviceId);
-          return dev ? { ...n, data: { ...n.data, status: dev.status, interfaces: dev.interfaces || n.data.interfaces } } : n;
+          const dev = allDevices.find((d) => d.id === n.data?.deviceId);
+          if (!dev) return n;
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              status:     dev.status,
+              interfaces: dev.interfaces || n.data.interfaces,
+            },
+          };
         });
-        // Recolor edges based on fresh interface data
         setEdges((eds) => computeEdgeColors(eds, newNodes));
         return newNodes;
       });

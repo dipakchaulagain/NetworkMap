@@ -13,7 +13,7 @@
         "speed": 1000,
         "type": "copper",
         "operStatus": "up",
-        "adminStatus": "up"
+        "adminStatus": "down"
       },
       {
         "name": "eth1",
