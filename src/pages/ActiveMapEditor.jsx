@@ -406,8 +406,11 @@ export default function ActiveMapEditor() {
       </div>
 
       <div className="editor-body">
-        {/* ── Inventory Sidebar (edit mode only) ── */}
-        <div className={`active-sidebar ${isSidebarOpen && mode === 'edit' ? '' : 'collapsed'}`}>
+        {/* ── Inventory Sidebar — completely hidden in view mode ── */}
+        <div
+          className={`active-sidebar ${isSidebarOpen && mode === 'edit' ? '' : 'collapsed'}`}
+          style={mode !== 'edit' ? { display: 'none' } : undefined}
+        >
           <div className="active-sidebar-header">
             {isSidebarOpen && <span>Device Inventory</span>}
             <button

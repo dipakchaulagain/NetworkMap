@@ -375,9 +375,10 @@ const DraggableEdge = ({
       <path
         d={pathD}
         fill="none"
-        stroke="transparent"
-        strokeWidth={14}
-        className="edge-hit-area"
+        stroke="black"
+        strokeOpacity={0.001}
+        strokeWidth={16}
+        style={{ pointerEvents: 'stroke', cursor: 'default' }}
         onMouseEnter={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
         onMouseMove={(e)  => setTooltipPos({ x: e.clientX, y: e.clientY })}
         onMouseLeave={()  => setTooltipPos(null)}
