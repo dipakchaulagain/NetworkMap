@@ -238,3 +238,11 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans
 .dv-if-search{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:7px 12px;font-size:.85rem;color:#0f172a;min-width:220px;outline:none}
 .dv-if-search:focus{border-color:#f59e0b}
 .dv-type-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:600;background:#f1f5f9;color:#475569;text-transform:capitalize}
+.dv-admin-toggle{display:inline-flex;align-items:center;gap:5px;border:none;border-radius:9999px;padding:3px 10px 3px 6px;font-size:.75rem;font-weight:600;cursor:pointer;transition:background .15s,opacity .15s;text-transform:uppercase;letter-spacing:.03em}
+.dv-admin-toggle:disabled{opacity:.5;cursor:not-allowed}
+.dv-admin-toggle.is-up{background:rgba(34,197,94,0.12);color:#16a34a}
+.dv-admin-toggle.is-up:not(:disabled):hover{background:rgba(239,68,68,0.12);color:#dc2626}
+.dv-admin-toggle.is-down{background:rgba(239,68,68,0.12);color:#dc2626}
+.dv-admin-toggle.is-down:not(:disabled):hover{background:rgba(34,197,94,0.12);color:#16a34a}
+.dv-admin-toggle-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+.dv-admin-toggle-label{line-height:1}

@@ -40,6 +40,21 @@ function StatusDot({ status }) {
   );
 }
 
+function AdminToggle({ status, saving, onClick }) {
+  const isUp = status === 'up';
+  return (
+    <button
+      className={`dv-admin-toggle ${isUp ? 'is-up' : 'is-down'}`}
+      onClick={onClick}
+      disabled={saving}
+      title={`Admin status: ${status}. Click to toggle.`}
+    >
+      <span className="dv-admin-toggle-dot" />
+      <span className="dv-admin-toggle-label">{saving ? '…' : (isUp ? 'Up' : 'Down')}</span>
+    </button>
+  );
+}
+
 function InfoRow({ label, value }) {
   if (!value && value !== 0) return null;
   return (
@@ -59,6 +74,7 @@ export default function DeviceView() {
   const [ifFilter, setIfFilter] = useState('all');
   const [ifSearch, setIfSearch] = useState('');
   const [error, setError] = useState('');
+  const [savingIdx, setSavingIdx] = useState(null);
 
   const fetchDevice = async () => {
     try {
@@ -83,6 +99,29 @@ export default function DeviceView() {
     setPolling(false);
   };
 
+  const handleToggleAdmin = async (realIdx) => {
+    if (savingIdx !== null) return;
+    setSavingIdx(realIdx);
+
+    const updatedInterfaces = (device.interfaces || []).map((iface, i) => {
+      if (i !== realIdx) return iface;
+      const newAdmin = iface.adminStatus === 'up' ? 'down' : 'up';
+      return { ...iface, adminStatus: newAdmin };
+    });
+
+    const optimistic = { ...device, interfaces: updatedInterfaces };
+    setDevice(optimistic);
+
+    try {
+      const res = await api.put(`/devices/${id}`, { interfaces: updatedInterfaces });
+      setDevice(res.data);
+    } catch (e) {
+      console.error(e);
+      setDevice(device);
+    }
+    setSavingIdx(null);
+  };
+
   if (loading) return <div className="page-loading">Loading device…</div>;
   if (error)   return <div className="page-loading" style={{ color: '#ef4444' }}>{error}</div>;
   if (!device) return null;
@@ -90,16 +129,19 @@ export default function DeviceView() {
   const isSNMP = device.category === 'snmp';
   const vendorColor = VENDOR_COLORS[device.vendor] || '#6b7280';
 
-  const interfaces = (device.interfaces || []).filter((iface) => {
-    const matchStatus = ifFilter === 'all' || iface.operStatus === ifFilter;
-    const matchSearch = !ifSearch || iface.name.toLowerCase().includes(ifSearch.toLowerCase())
+  const interfacesWithIdx = (device.interfaces || []).map((iface, realIdx) => ({ ...iface, realIdx }));
+
+  const filtered = interfacesWithIdx.filter((iface) => {
+    const matchStatus = ifFilter === 'all' || iface.adminStatus === ifFilter;
+    const matchSearch = !ifSearch
+      || iface.name.toLowerCase().includes(ifSearch.toLowerCase())
       || (iface.alias || '').toLowerCase().includes(ifSearch.toLowerCase())
       || (iface.description || '').toLowerCase().includes(ifSearch.toLowerCase());
     return matchStatus && matchSearch;
   });
 
-  const upCount   = (device.interfaces || []).filter((i) => i.operStatus === 'up').length;
-  const downCount = (device.interfaces || []).filter((i) => i.operStatus === 'down').length;
+  const upCount   = (device.interfaces || []).filter((i) => i.adminStatus === 'up').length;
+  const downCount = (device.interfaces || []).filter((i) => i.adminStatus === 'down').length;
 
   return (
     <div className="page" style={{ overflow: 'auto' }}>
@@ -116,8 +158,14 @@ export default function DeviceView() {
                   {device.vendor}
                 </span>
               )}
+              {!isSNMP && (
+                <span className="dv-vendor-badge" style={{ background: '#334155' }}>Custom Node</span>
+              )}
             </h1>
-            <p className="page-subtitle">{device.type} · {device.category === 'snmp' ? 'SNMP Monitored' : 'Custom Node'}{device.location ? ` · ${device.location}` : ''}</p>
+            <p className="page-subtitle">
+              {device.type} · {isSNMP ? 'SNMP Monitored' : 'Custom Node'}
+              {device.location ? ` · ${device.location}` : ''}
+            </p>
           </div>
         </div>
         {isSNMP && (
@@ -133,7 +181,7 @@ export default function DeviceView() {
           <div className="dv-info-rows">
             <InfoRow label="Device Name"  value={device.name} />
             <InfoRow label="Type"         value={device.type} />
-            <InfoRow label="Category"     value={device.category === 'snmp' ? 'SNMP Monitored' : 'Custom Node'} />
+            <InfoRow label="Category"     value={isSNMP ? 'SNMP Monitored' : 'Custom Node'} />
             <InfoRow label="Location"     value={device.location} />
             <InfoRow label="Description"  value={device.description} />
             {isSNMP && <>
@@ -168,49 +216,54 @@ export default function DeviceView() {
           </div>
         )}
 
-        {isSNMP && (
-          <div className="dv-card dv-card--stat-row">
-            <div className="dv-stat">
-              <span className="dv-stat-value">{(device.interfaces || []).length}</span>
-              <span className="dv-stat-label">Total Interfaces</span>
-            </div>
-            <div className="dv-stat">
-              <span className="dv-stat-value" style={{ color: '#22c55e' }}>{upCount}</span>
-              <span className="dv-stat-label">Up</span>
-            </div>
-            <div className="dv-stat">
-              <span className="dv-stat-value" style={{ color: '#ef4444' }}>{downCount}</span>
-              <span className="dv-stat-label">Down</span>
-            </div>
+        <div className="dv-card dv-card--stat-row">
+          <div className="dv-stat">
+            <span className="dv-stat-value">{(device.interfaces || []).length}</span>
+            <span className="dv-stat-label">Total Interfaces</span>
           </div>
-        )}
+          <div className="dv-stat">
+            <span className="dv-stat-value" style={{ color: '#22c55e' }}>{upCount}</span>
+            <span className="dv-stat-label">Admin Up</span>
+          </div>
+          <div className="dv-stat">
+            <span className="dv-stat-value" style={{ color: '#ef4444' }}>{downCount}</span>
+            <span className="dv-stat-label">Admin Down</span>
+          </div>
+        </div>
       </div>
 
       <div className="dv-section-title">
         Network Interfaces
-        <span className="dv-if-count">{interfaces.length} shown</span>
+        <span className="dv-if-count">{filtered.length} shown</span>
+        {!isSNMP && (
+          <span style={{ fontSize: '0.76rem', color: '#94a3b8', fontWeight: 400, marginLeft: 4 }}>
+            — Click Admin status to toggle
+          </span>
+        )}
       </div>
 
       <div className="dv-if-toolbar">
         <input
           className="dv-if-search"
-          placeholder="Search by name or alias…"
+          placeholder="Search by name…"
           value={ifSearch}
           onChange={(e) => setIfSearch(e.target.value)}
         />
         <div className="tabs" style={{ margin: 0 }}>
           {['all', 'up', 'down'].map((f) => (
             <button key={f} className={`tab ${ifFilter === f ? 'active' : ''}`} onClick={() => setIfFilter(f)}>
-              {f === 'all' ? 'All' : f === 'up' ? 'Up' : 'Down'}
+              {f === 'all' ? 'All' : f === 'up' ? 'Admin Up' : 'Admin Down'}
             </button>
           ))}
         </div>
       </div>
 
-      {interfaces.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="empty-card">
           <p>{(device.interfaces || []).length === 0
-            ? isSNMP ? 'No interface data yet. Click "Poll Now" to fetch interfaces from the device.' : 'No interfaces defined.'
+            ? isSNMP
+              ? 'No interface data yet. Click "Poll Now" to fetch interfaces from the device.'
+              : 'No interfaces defined.'
             : 'No interfaces match your filter.'
           }</p>
         </div>
@@ -226,24 +279,44 @@ export default function DeviceView() {
                 <th>Type</th>
                 {isSNMP && <th>MAC Address</th>}
                 {isSNMP && <th>MTU</th>}
-                <th>Admin</th>
-                <th>Oper</th>
+                <th>Admin Status</th>
+                {isSNMP && <th>Oper Status</th>}
               </tr>
             </thead>
             <tbody>
-              {interfaces.map((iface, i) => (
-                <tr key={i}>
+              {filtered.map((iface) => (
+                <tr key={iface.realIdx}>
                   {isSNMP && <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{iface.index}</td>}
                   <td><strong>{iface.name}</strong></td>
-                  {isSNMP && <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{iface.alias || iface.description || '—'}</td>}
+                  {isSNMP && (
+                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                      {iface.alias || iface.description || '—'}
+                    </td>
+                  )}
                   <td>{speedLabel(iface.speedMbps, iface.speed)}</td>
                   <td>
                     <span className="dv-type-badge">{iface.type || iface.typeLabel || '—'}</span>
                   </td>
-                  {isSNMP && <td><code style={{ fontSize: '0.78rem' }}>{iface.physAddr || '—'}</code></td>}
-                  {isSNMP && <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{iface.mtu || '—'}</td>}
-                  <td><StatusDot status={iface.adminStatus} /></td>
-                  <td><StatusDot status={iface.operStatus} /></td>
+                  {isSNMP && (
+                    <td><code style={{ fontSize: '0.78rem' }}>{iface.physAddr || '—'}</code></td>
+                  )}
+                  {isSNMP && (
+                    <td style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{iface.mtu || '—'}</td>
+                  )}
+                  <td>
+                    {isSNMP ? (
+                      <StatusDot status={iface.adminStatus} />
+                    ) : (
+                      <AdminToggle
+                        status={iface.adminStatus}
+                        saving={savingIdx === iface.realIdx}
+                        onClick={() => handleToggleAdmin(iface.realIdx)}
+                      />
+                    )}
+                  </td>
+                  {isSNMP && (
+                    <td><StatusDot status={iface.operStatus} /></td>
+                  )}
                 </tr>
               ))}
             </tbody>
