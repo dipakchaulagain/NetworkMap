@@ -23,8 +23,21 @@ router.post('/login', async (req, res) => {
     return res.status(401).json({ message: 'Invalid credentials' });
   }
 
-  const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-  res.json({ token, user: { id: user.id, username: user.username, role: user.role, email: user.email } });
+  const token = jwt.sign(
+    { id: user.id, username: user.username, role: user.role },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      username: user.username,
+      fullName: user.fullName || '',
+      role: user.role,
+      email: user.email || '',
+    },
+  });
 });
 
 router.post('/logout', (req, res) => {

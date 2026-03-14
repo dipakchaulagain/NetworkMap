@@ -5,6 +5,7 @@
     "password": "$2b$10$r5.j05qcnbOPIYOhMa9KDeIW4vau6Ob9iuqBZjLgO12obrS7JTxAm",
     "role": "admin",
     "email": "admin@networkmap.local",
+    "fullName": "Administrator",
     "createdAt": "2024-01-01T00:00:00.000Z"
   }
 ]

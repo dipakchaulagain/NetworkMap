@@ -1,10 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const navItems = [
+const allNavItems = [
   {
     to: '/dashboard',
     label: 'Dashboard',
+    roles: ['admin', 'editor', 'viewer'],
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8"/>
@@ -17,6 +18,7 @@ const navItems = [
   {
     to: '/devices',
     label: 'Devices',
+    roles: ['admin', 'editor', 'viewer'],
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="1.8"/>
@@ -30,6 +32,7 @@ const navItems = [
   {
     to: '/maps',
     label: 'Maps',
+    roles: ['admin', 'editor', 'viewer'],
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/>
@@ -47,6 +50,7 @@ const navItems = [
   {
     to: '/users',
     label: 'Users',
+    roles: ['admin'],
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/>
@@ -57,6 +61,7 @@ const navItems = [
   {
     to: '/settings',
     label: 'Settings',
+    roles: ['admin', 'editor'],
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/>
@@ -66,6 +71,8 @@ const navItems = [
   },
 ];
 
+const ROLE_COLORS = { admin: '#ef4444', editor: '#f59e0b', viewer: '#6366f1' };
+
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -74,6 +81,10 @@ export default function Layout({ children }) {
     logout();
     navigate('/login');
   };
+
+  const navItems = allNavItems.filter((item) => item.roles.includes(user?.role));
+  const displayName = user?.fullName || user?.username || '';
+  const initials = displayName.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <div className="app-layout">
@@ -104,10 +115,12 @@ export default function Layout({ children }) {
 
         <div className="sidebar-footer">
           <div className="user-info">
-            <div className="user-avatar">{user?.username?.[0]?.toUpperCase()}</div>
+            <div className="user-avatar">{initials || user?.username?.[0]?.toUpperCase()}</div>
             <div className="user-details">
-              <span className="user-name">{user?.username}</span>
-              <span className="user-role">{user?.role}</span>
+              <span className="user-name">{user?.fullName || user?.username}</span>
+              <span className="user-role" style={{ color: ROLE_COLORS[user?.role] || '#94a3b8' }}>
+                {user?.role}
+              </span>
             </div>
           </div>
           <button className="logout-btn" onClick={handleLogout} title="Logout">

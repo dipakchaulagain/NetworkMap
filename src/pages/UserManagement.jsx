@@ -6,6 +6,7 @@ function UserModal({ user, onClose, onSave }) {
   const editing = !!user;
   const [form, setForm] = useState({
     username: user?.username || '',
+    fullName: user?.fullName || '',
     email: user?.email || '',
     role: user?.role || 'viewer',
     password: '',
@@ -14,7 +15,7 @@ function UserModal({ user, onClose, onSave }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    const payload = { username: form.username, email: form.email, role: form.role };
+    const payload = { username: form.username, fullName: form.fullName, email: form.email, role: form.role };
     if (form.password) payload.password = form.password;
     await onSave(payload);
     onClose();
@@ -28,15 +29,29 @@ function UserModal({ user, onClose, onSave }) {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <form onSubmit={submit} className="modal-form">
-          <div className="form-group"><label>Username *</label><input value={form.username} onChange={f('username')} required disabled={editing} /></div>
-          <div className="form-group"><label>Email</label><input type="email" value={form.email} onChange={f('email')} /></div>
-          <div className="form-group">
-            <label>Role</label>
-            <select value={form.role} onChange={f('role')}>
-              <option value="admin">Admin</option>
-              <option value="editor">Editor</option>
-              <option value="viewer">Viewer</option>
-            </select>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Username *</label>
+              <input value={form.username} onChange={f('username')} required disabled={editing} placeholder="e.g. jsmith" />
+            </div>
+            <div className="form-group">
+              <label>Full Name</label>
+              <input value={form.fullName} onChange={f('fullName')} placeholder="e.g. John Smith" />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Email</label>
+              <input type="email" value={form.email} onChange={f('email')} placeholder="user@example.com" />
+            </div>
+            <div className="form-group">
+              <label>Role</label>
+              <select value={form.role} onChange={f('role')}>
+                <option value="admin">Admin — Full access</option>
+                <option value="editor">Editor — Can edit maps &amp; settings</option>
+                <option value="viewer">Viewer — Read-only access</option>
+              </select>
+            </div>
           </div>
           <div className="form-group">
             <label>{editing ? 'New Password (leave blank to keep)' : 'Password *'}</label>
@@ -51,6 +66,9 @@ function UserModal({ user, onClose, onSave }) {
     </div>
   );
 }
+
+const ROLE_COLORS = { admin: '#ef4444', editor: '#f59e0b', viewer: '#6366f1' };
+const ROLE_LABELS = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer' };
 
 export default function UserManagement() {
   const { user: me } = useAuth();
@@ -87,12 +105,13 @@ export default function UserManagement() {
   };
 
   const openEdit = (user) => { setEditingUser(user); setShowModal(true); };
-  const openAdd = () => { setEditingUser(null); setShowModal(true); };
+  const openAdd  = () => { setEditingUser(null); setShowModal(true); };
 
-  const roleBadge = (role) => {
-    const colors = { admin: '#ef4444', editor: '#f59e0b', viewer: '#6366f1' };
-    return <span className="role-badge" style={{ background: colors[role] || '#64748b' }}>{role}</span>;
-  };
+  const roleBadge = (role) => (
+    <span className="role-badge" style={{ background: ROLE_COLORS[role] || '#64748b' }}>
+      {ROLE_LABELS[role] || role}
+    </span>
+  );
 
   if (loading) return <div className="page-loading">Loading…</div>;
 
@@ -103,40 +122,55 @@ export default function UserManagement() {
           <h1>User Management</h1>
           <p className="page-subtitle">Manage portal access and roles</p>
         </div>
-        {me?.role === 'admin' && <button className="btn-primary" onClick={openAdd}>+ Add User</button>}
+        <button className="btn-primary" onClick={openAdd}>+ Add User</button>
+      </div>
+
+      <div className="dv-card" style={{ marginBottom: 16, padding: '12px 20px' }}>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+          {[
+            { role: 'admin',  desc: 'Full access — manage all resources, users, and settings.' },
+            { role: 'editor', desc: 'Can create and edit maps and modify settings. Cannot manage users.' },
+            { role: 'viewer', desc: 'Read-only access to devices and maps. Cannot edit or configure.' },
+          ].map(({ role, desc }) => (
+            <div key={role} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: '1 1 200px' }}>
+              {roleBadge(role)}
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{desc}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="table-card">
         <table className="data-table">
           <thead>
             <tr>
+              <th>Full Name</th>
               <th>Username</th>
               <th>Email</th>
               <th>Role</th>
               <th>Created</th>
-              {me?.role === 'admin' && <th>Actions</th>}
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
               <tr key={u.id}>
                 <td>
-                  <strong>{u.username}</strong>
+                  <strong>{u.fullName || '—'}</strong>
                   {u.id === me?.id && <span className="you-badge"> (you)</span>}
                 </td>
+                <td><code style={{ fontSize: '0.85rem' }}>{u.username}</code></td>
                 <td>{u.email || '—'}</td>
                 <td>{roleBadge(u.role)}</td>
                 <td>{new Date(u.createdAt).toLocaleDateString()}</td>
-                {me?.role === 'admin' && (
-                  <td>
-                    <div className="action-btns">
-                      <button className="btn-sm" onClick={() => openEdit(u)}>Edit</button>
-                      {u.id !== me.id && (
-                        <button className="btn-sm danger" onClick={() => handleDelete(u.id)}>Delete</button>
-                      )}
-                    </div>
-                  </td>
-                )}
+                <td>
+                  <div className="action-btns">
+                    <button className="btn-sm" onClick={() => openEdit(u)}>Edit</button>
+                    {u.id !== me.id && (
+                      <button className="btn-sm danger" onClick={() => handleDelete(u.id)}>Delete</button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -144,7 +178,11 @@ export default function UserManagement() {
       </div>
 
       {showModal && (
-        <UserModal user={editingUser} onClose={() => { setShowModal(false); setEditingUser(null); }} onSave={handleSave} />
+        <UserModal
+          user={editingUser}
+          onClose={() => { setShowModal(false); setEditingUser(null); }}
+          onSave={handleSave}
+        />
       )}
     </div>
   );

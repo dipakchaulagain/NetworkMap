@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 
 const deviceTypeOptions = ['router', 'switch', 'firewall', 'server', 'accesspoint', 'other'];
@@ -163,6 +164,7 @@ function InterfacesPanel({ device, onClose }) {
 }
 
 export default function Devices() {
+  const navigate = useNavigate();
   const [devices, setDevices] = useState([]);
   const [tab, setTab] = useState('snmp');
   const [showSnmpModal, setShowSnmpModal] = useState(false);
@@ -271,6 +273,7 @@ export default function Devices() {
                   </td>
                   <td>
                     <div className="action-btns">
+                      <button className="btn-sm" onClick={() => navigate(`/devices/${d.id}`)}>View</button>
                       {tab === 'snmp' && (
                         <button className="btn-sm" onClick={() => handlePoll(d)} disabled={polling[d.id]}>
                           {polling[d.id] ? '…' : 'Poll'}

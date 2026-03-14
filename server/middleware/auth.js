@@ -22,3 +22,10 @@ export function requireAdmin(req, res, next) {
   }
   next();
 }
+
+export function requireEditor(req, res, next) {
+  if (!['admin', 'editor'].includes(req.user?.role)) {
+    return res.status(403).json({ message: 'Editor or Admin access required' });
+  }
+  next();
+}

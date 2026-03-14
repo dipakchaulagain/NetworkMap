@@ -14,7 +14,7 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', requireAdmin, async (req, res) => {
-  const { username, password, role, email } = req.body;
+  const { username, password, role, email, fullName } = req.body;
   if (!username || !password) return res.status(400).json({ message: 'Username and password required' });
 
   const users = readData('users.json');
@@ -23,7 +23,15 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 
   const hashed = await bcrypt.hash(password, 10);
-  const newUser = { id: uuidv4(), username, password: hashed, role: role || 'viewer', email: email || '', createdAt: new Date().toISOString() };
+  const newUser = {
+    id: uuidv4(),
+    username,
+    password: hashed,
+    role: role || 'viewer',
+    email: email || '',
+    fullName: fullName || '',
+    createdAt: new Date().toISOString(),
+  };
   users.push(newUser);
   writeData('users.json', users);
   const { password: _, ...safe } = newUser;
@@ -35,10 +43,11 @@ router.put('/:id', requireAdmin, async (req, res) => {
   const idx = users.findIndex((u) => u.id === req.params.id);
   if (idx === -1) return res.status(404).json({ message: 'User not found' });
 
-  const { username, password, role, email } = req.body;
+  const { username, password, role, email, fullName } = req.body;
   if (username) users[idx].username = username;
   if (role) users[idx].role = role;
   if (email !== undefined) users[idx].email = email;
+  if (fullName !== undefined) users[idx].fullName = fullName;
   if (password) users[idx].password = await bcrypt.hash(password, 10);
 
   writeData('users.json', users);
