@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ReactFlow, Controls, MiniMap, Background, useNodesState, useEdgesState,
   addEdge, Panel,
@@ -27,6 +27,7 @@ const getId = () => `node_${nodeIdCounter++}`;
 export default function StaticMapEditor() {
   const { mapId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const reactFlowWrapper = useRef(null);
   const [mapMeta, setMapMeta] = useState(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -35,7 +36,7 @@ export default function StaticMapEditor() {
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const isFirstRender = useRef(true);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState('edit');
+  const [mode, setMode] = useState(searchParams.get('mode') === 'view' ? 'view' : 'edit');
 
   useEffect(() => {
     const load = async () => {

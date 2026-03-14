@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ReactFlow, Controls, MiniMap, Background, useNodesState, useEdgesState,
   Panel, Handle, Position,
@@ -102,6 +102,7 @@ const getNodeId = () => `an_${nodeCounter++}`;
 export default function ActiveMapEditor() {
   const { mapId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const wrapperRef = useRef(null);
 
   const [mapMeta, setMapMeta]         = useState(null);
@@ -112,7 +113,7 @@ export default function ActiveMapEditor() {
   const [hasUnsaved, setHasUnsaved]   = useState(false);
   const [loading, setLoading]         = useState(true);
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [mode, setMode]               = useState('edit');
+  const [mode, setMode]               = useState(searchParams.get('mode') === 'view' ? 'view' : 'edit');
 
   // Interface picker state
   const [pickerStep, setPickerStep]   = useState(null);

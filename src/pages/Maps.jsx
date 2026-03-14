@@ -99,8 +99,14 @@ export default function Maps() {
     setMaps((p) => p.filter((m) => m.id !== id));
   };
 
-  const openMap = (map) => {
-    navigate(`/maps/${map.id}/${map.type}`);
+  const viewMap = (map, e) => {
+    e.stopPropagation();
+    navigate(`/maps/${map.id}/${map.type}?mode=view`);
+  };
+
+  const editMap = (map, e) => {
+    e.stopPropagation();
+    navigate(`/maps/${map.id}/${map.type}?mode=edit`);
   };
 
   if (loading) return <div className="page-loading">Loading…</div>;
@@ -134,7 +140,7 @@ export default function Maps() {
       ) : (
         <div className="maps-grid">
           {maps.map((map) => (
-            <div key={map.id} className="map-card" onClick={() => openMap(map)}>
+            <div key={map.id} className="map-card">
               <div className="map-card-type-badge">{map.type}</div>
               <div className="map-card-icon">
                 {map.type === 'active' ? (
@@ -165,7 +171,8 @@ export default function Maps() {
                 <span className="map-card-date">{new Date(map.updatedAt || map.createdAt).toLocaleDateString()}</span>
               </div>
               <div className="map-card-actions">
-                <button className="btn-sm" onClick={() => openMap(map)}>Open</button>
+                <button className="btn-sm view-btn" onClick={(e) => viewMap(map, e)}>View</button>
+                <button className="btn-sm edit-btn" onClick={(e) => editMap(map, e)}>Edit</button>
                 <button className="btn-sm danger" onClick={(e) => handleDelete(map.id, e)}>Delete</button>
               </div>
             </div>
